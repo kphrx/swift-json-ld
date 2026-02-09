@@ -1,3 +1,6 @@
+// Copyright 2026 kPherox
+// SPDX-License-Identifier: Apache-2.0
+
 public typealias JSONArray = [JSONValue]
 public typealias JSONObject = [String: JSONValue]
 

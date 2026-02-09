@@ -1,3 +1,6 @@
+// Copyright 2026 kPherox
+// SPDX-License-Identifier: Apache-2.0
+
 #if os(macOS) || os(tvOS) || os(iOS) || os(watchOS)
 import struct Foundation.Decimal
 #endif
