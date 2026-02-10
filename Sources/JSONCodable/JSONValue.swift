@@ -83,3 +83,21 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral,
     self = .object(.init(uniqueKeysWithValues: elements))
   }
 }
+
+extension JSONValue {
+  subscript(_ index: Int) -> JSONValue? {
+    if case .array(let array) = self, array.indices.contains(index) {
+      array[index]
+    } else {
+      nil
+    }
+  }
+
+  subscript(_ key: String) -> JSONValue? {
+    if case .object(let object) = self {
+      object[key]
+    } else {
+      nil
+    }
+  }
+}

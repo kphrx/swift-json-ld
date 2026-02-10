@@ -81,4 +81,40 @@ struct JSONValueTests {
         == #"{"metadata":{"empty":null,"floating":3.14},"openRegistrations":false,"protocols":["activitypub"],"services":{"inbound":[],"outbound":[]},"software":{"name":"pleroma","repository":"https://git.pleroma.social/pleroma/pleroma","version":"2.7.0-0-g4139864"},"usage":{"localPosts":32842,"users":{"activeHalfyear":1,"activeMonth":1,"total":4}},"version":"2.1"}"#
     )
   }
+
+  @Test("Access via subscript for Array and Dictionary") func accessViaSubscript() {
+    let json: JSONValue = [
+      "version": "2.1",
+      "protocols": ["activitypub"],
+      "usage": [
+        "users": [
+          "total": 4,
+          "activeHalfyear": 1,
+          "activeMonth": 1,
+        ],
+        "localPosts": 32842,
+      ],
+      "services": [
+        "inbound": [],
+        "outbound": [],
+      ],
+      "software": [
+        "name": "pleroma",
+        "version": "2.7.0-0-g4139864",
+        "repository": "https://git.pleroma.social/pleroma/pleroma",
+      ],
+      "openRegistrations": false,
+      "metadata": [
+        "empty": nil,
+        "floating": 3.14,
+      ],
+    ]
+
+    #expect(json["version"] == .string("2.1"))
+    #expect(json["protocols"]?[0] == .string("activitypub"))
+    #expect(json["usage"]?["users"]?["total"] == .integer(4))
+    #expect(json["openRegistrations"] == .boolean(false))
+    #expect(json["metadata"]?["empty"] == .null)
+    #expect(json["metadata"]?["floating"] == .float(3.14))
+  }
 }
