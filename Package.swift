@@ -20,5 +20,13 @@ let package = Package(
       name: "JSONCodableTests",
       dependencies: ["JSONCodable"]
     ),
+    .target(
+      name: "JSONLD",
+      dependencies: ["JSONCodable"]
+    ),
+    .testTarget(
+      name: "JSONLDTests",
+      dependencies: ["JSONLD"]
+    ),
   ]
 )
