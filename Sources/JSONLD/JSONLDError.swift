@@ -3,10 +3,23 @@
 
 enum JSONLDError: Error, Equatable {
   case notObject
+
+  case invalidIndex
+
+  // `@context`s errors
   case invalidContextValue
   case invalidIRI(String)
+
+  // Node Objects errors
   case invalidNodeID
   case invalidNodeType
   case invalidReverse
-  case invalidNodeIndex
+
+  // Value Objects errors
+  case missingValue
+  case invalidValue
+  case invalidValueType
+  case invalidLanguage
+  case mustNotContainBothTypeAndLanguage
+  case mustNotContainAnyOtherKeys
 }

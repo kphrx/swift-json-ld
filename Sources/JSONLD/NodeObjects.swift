@@ -89,7 +89,7 @@ public struct NodeObject {
         if case .string(let value) = index {
           value
         } else {
-          throw .invalidNodeIndex
+          throw .invalidIndex
         }
       } else { nil }
     self.properties = properties
