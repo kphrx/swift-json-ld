@@ -25,4 +25,10 @@ enum JSONLDError: Error, Equatable {
 
   // Lists and Sets errors
   case invalidSetValue
+
+  // Language Maps errors
+  case invalidLanguageMapValue
+
+  // Index Maps errors
+  case invalidIndexedValue
 }
