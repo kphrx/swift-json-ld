@@ -22,4 +22,7 @@ enum JSONLDError: Error, Equatable {
   case invalidLanguage
   case mustNotContainBothTypeAndLanguage
   case mustNotContainAnyOtherKeys
+
+  // Lists and Sets errors
+  case invalidSetValue
 }
