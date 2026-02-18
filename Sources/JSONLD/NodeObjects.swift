@@ -60,33 +60,31 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
 
     self.context = try properties.extractContext()
 
-    self.id =
-      if let id = properties.removeValue(forKey: "@id") {
-        if case .string(let value) = id {
-          value
-        } else {
-          throw .invalidNodeID
-        }
-      } else { nil }
+    self.id = try properties.removeValue(forKey: "@id").map { idValue throws(JSONLDError) in
+      if case .string(let value) = idValue {
+        value
+      } else {
+        throw .invalidNodeID
+      }
+    }
 
-    self.graph =
-      if let graph = properties.removeValue(forKey: "@graph") {
-        try .init(from: graph)
-      } else { nil }
+    self.graph = try properties.removeValue(forKey: "@graph").map {
+      graphValue throws(JSONLDError) in
+      try .init(from: graphValue)
+    }
 
-    self.type =
-      if let type = properties.removeValue(forKey: "@type") {
-        try .init(from: type)
-      } else { nil }
+    self.type = try properties.removeValue(forKey: "@type").map { typeValue throws(JSONLDError) in
+      try .init(from: typeValue)
+    }
 
-    self.reverse =
-      if let reverse = properties.removeValue(forKey: "@reverse") {
-        if case .object(let value) = reverse {
-          value
-        } else {
-          throw .invalidReverse
-        }
-      } else { nil }
+    self.reverse = try properties.removeValue(forKey: "@reverse").map {
+      reverseValue throws(JSONLDError) in
+      if case .object(let value) = reverseValue {
+        value
+      } else {
+        throw .invalidReverse
+      }
+    }
 
     self.index = try properties.extractIndex()
 

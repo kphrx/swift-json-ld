@@ -3,18 +3,18 @@
 
 extension JSONObject {
   mutating func extractContext() throws(JSONLDError) -> Contexts? {
-    if let context = self.removeValue(forKey: "@context") {
-      try .init(from: context)
-    } else { nil }
+    try self.removeValue(forKey: "@context").map { contextValue throws(JSONLDError) in
+      try .init(from: contextValue)
+    }
   }
 
   mutating func extractIndex() throws(JSONLDError) -> String? {
-    if let index = self.removeValue(forKey: "@index") {
-      if case .string(let value) = index {
+    try self.removeValue(forKey: "@index").map { indexValue throws(JSONLDError) in
+      if case .string(let value) = indexValue {
         value
       } else {
         throw .invalidIndex
       }
-    } else { nil }
+    }
   }
 }
