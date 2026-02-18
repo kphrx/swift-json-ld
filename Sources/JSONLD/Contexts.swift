@@ -3,7 +3,7 @@
 
 import struct Foundation.URL
 
-enum Contexts {
+enum Contexts: Equatable {
   case null
   case single(Context)
   case array([Context])
@@ -22,7 +22,7 @@ enum Contexts {
   }
 }
 
-enum Context {
+enum Context: Equatable {
   case absolute(URL)
   case relative(URL)
   case contextDefinition(ContextDefinition)
@@ -46,7 +46,7 @@ enum Context {
   }
 }
 
-struct ContextDefinition {
+struct ContextDefinition: Equatable {
   private let rawValue: JSONObject
 
   init(from jsonObject: JSONObject) {

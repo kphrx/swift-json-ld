@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-enum SetValue {
+enum SetValue: Equatable {
   case string(String)
   case integer(Int)
   case float(Double)
@@ -33,7 +33,7 @@ enum SetValue {
   }
 }
 
-struct ListObject {
+struct ListObject: Equatable {
   let list: [SetValue]
   let context: Contexts?
   let index: String?
@@ -79,7 +79,7 @@ struct ListObject {
   }
 }
 
-struct SetObject {
+struct SetObject: Equatable {
   let set: [SetValue]
   let context: Contexts?
   let index: String?

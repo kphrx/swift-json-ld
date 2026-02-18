@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-enum ValueType {
+enum ValueType: Equatable {
   case term(String)
   case compactIRI(String)
   case absoluteIRI(String)
@@ -18,8 +18,8 @@ enum ValueType {
   }
 }
 
-struct ValueObject {
-  enum Value {
+struct ValueObject: Equatable {
+  enum Value: Equatable {
     case string(String)
     case integer(Int)
     case float(Double)

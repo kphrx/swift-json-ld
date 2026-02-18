@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-struct LanguageMap {
+struct LanguageMap: Equatable {
   let map: [String: [String]]
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {

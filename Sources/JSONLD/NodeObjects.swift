@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public indirect enum NodeObjects {
+public indirect enum NodeObjects: Equatable {
   case single(NodeObject)
   case array([NodeObject])
 
@@ -22,7 +22,7 @@ public indirect enum NodeObjects {
   }
 }
 
-enum NodeTypes {
+enum NodeTypes: Equatable {
   case single(String)
   case array([String])
 
@@ -43,8 +43,7 @@ enum NodeTypes {
   }
 }
 
-public struct NodeObject {
-  private let rawValue: JSONObject
+public struct NodeObject: Equatable {
   let context: Contexts?
   let id: String?
   let graph: NodeObjects?
@@ -54,7 +53,6 @@ public struct NodeObject {
   let properties: JSONObject
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
-    self.rawValue = jsonObject
     var properties = jsonObject
     self.context =
       if let context = properties.removeValue(forKey: "@context") {
