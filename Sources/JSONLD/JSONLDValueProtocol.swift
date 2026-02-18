@@ -1,0 +1,34 @@
+// Copyright 2026 kPherox
+// SPDX-License-Identifier: Apache-2.0
+
+protocol JSONLDValueProtocol {
+  init(from jsonValue: JSONValue) throws(JSONLDError)
+}
+
+protocol JSONLDArrayProtocol: JSONLDValueProtocol {
+  init(from jsonArray: JSONArray) throws(JSONLDError)
+}
+
+protocol JSONLDObjectProtocol: JSONLDValueProtocol {
+  init(from jsonObject: JSONObject) throws(JSONLDError)
+}
+
+extension JSONLDValueProtocol where Self: JSONLDObjectProtocol {
+  init(from jsonValue: JSONValue) throws(JSONLDError) {
+    if case .object(let jsonObject) = jsonValue {
+      try self.init(from: jsonObject)
+    } else {
+      throw .notObject
+    }
+  }
+}
+
+extension JSONLDValueProtocol where Self: JSONLDArrayProtocol {
+  init(from jsonValue: JSONValue) throws(JSONLDError) {
+    if case .array(let jsonArray) = jsonValue {
+      try self.init(from: jsonArray)
+    } else {
+      throw .notObject
+    }
+  }
+}

@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public indirect enum NodeObjects: Equatable {
+public indirect enum NodeObjects: JSONLDObjectProtocol, JSONLDArrayProtocol, Equatable {
   case single(NodeObject)
   case array([NodeObject])
 
@@ -22,28 +22,31 @@ public indirect enum NodeObjects: Equatable {
   }
 }
 
-enum NodeTypes: Equatable {
+enum NodeTypes: JSONLDValueProtocol, JSONLDArrayProtocol, Equatable {
   case single(String)
   case array([String])
+
+  init(from jsonArray: JSONArray) throws(JSONLDError) {
+    self = .array(
+      try jsonArray.map { jsonValue throws(JSONLDError) in
+        if case .string(let value) = jsonValue {
+          value
+        } else {
+          throw .invalidNodeType
+        }
+      })
+  }
 
   init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
     case .string(let value): self = .single(value)
-    case .array(let jsonArray):
-      self = .array(
-        try jsonArray.map { jsonValue throws(JSONLDError) in
-          if case .string(let value) = jsonValue {
-            value
-          } else {
-            throw .invalidNodeType
-          }
-        })
+    case .array(let jsonArray): self = try .init(from: jsonArray)
     default: throw .invalidNodeType
     }
   }
 }
 
-public struct NodeObject: Equatable {
+public struct NodeObject: JSONLDObjectProtocol, Equatable {
   let context: Contexts?
   let id: String?
   let graph: NodeObjects?

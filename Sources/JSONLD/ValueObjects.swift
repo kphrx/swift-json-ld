@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-enum ValueType: Equatable {
+enum ValueType: JSONLDValueProtocol, Equatable {
   case term(String)
   case compactIRI(String)
   case absoluteIRI(String)
@@ -18,8 +18,8 @@ enum ValueType: Equatable {
   }
 }
 
-struct ValueObject: Equatable {
-  enum Value: Equatable {
+struct ValueObject: JSONLDObjectProtocol, Equatable {
+  enum Value: JSONLDValueProtocol, Equatable {
     case string(String)
     case integer(Int)
     case float(Double)
@@ -82,14 +82,6 @@ struct ValueObject: Equatable {
 
     if !properties.isEmpty {
       throw .mustNotContainAnyOtherKeys
-    }
-  }
-
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
-    if case .object(let jsonObject) = jsonValue {
-      try self.init(from: jsonObject)
-    } else {
-      throw .notObject
     }
   }
 }

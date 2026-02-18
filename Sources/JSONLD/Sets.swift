@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-enum SetValue: Equatable {
+enum SetValue: JSONLDValueProtocol, Equatable {
   case string(String)
   case integer(Int)
   case float(Double)
@@ -33,7 +33,7 @@ enum SetValue: Equatable {
   }
 }
 
-struct ListObject: Equatable {
+struct ListObject: JSONLDObjectProtocol, Equatable {
   let list: [SetValue]
   let context: Contexts?
   let index: String?
@@ -69,17 +69,9 @@ struct ListObject: Equatable {
       throw .mustNotContainAnyOtherKeys
     }
   }
-
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
-    if case .object(let jsonObject) = jsonValue {
-      try self.init(from: jsonObject)
-    } else {
-      throw .notObject
-    }
-  }
 }
 
-struct SetObject: Equatable {
+struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
   let set: [SetValue]
   let context: Contexts?
   let index: String?
@@ -113,14 +105,6 @@ struct SetObject: Equatable {
 
     if !properties.isEmpty {
       throw .mustNotContainAnyOtherKeys
-    }
-  }
-
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
-    if case .object(let jsonObject) = jsonValue {
-      try self.init(from: jsonObject)
-    } else {
-      throw .notObject
     }
   }
 }

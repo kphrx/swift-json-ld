@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-enum IndexedValue: Equatable {
+enum IndexedValue: JSONLDValueProtocol, Equatable {
   case string(String)
   case integer(Int)
   case float(Double)
@@ -39,7 +39,7 @@ enum IndexedValue: Equatable {
   }
 }
 
-struct IndexMap: Equatable {
+struct IndexMap: JSONLDObjectProtocol, Equatable {
   let map: [String: [IndexedValue]]
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
@@ -49,14 +49,6 @@ struct IndexMap: Equatable {
       } else {
         [try .init(from: jsonValue)]
       }
-    }
-  }
-
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
-    if case .object(let jsonObject) = jsonValue {
-      try self.init(from: jsonObject)
-    } else {
-      throw .notObject
     }
   }
 }

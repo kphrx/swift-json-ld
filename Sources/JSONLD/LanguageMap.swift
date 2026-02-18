@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-struct LanguageMap: Equatable {
+struct LanguageMap: JSONLDObjectProtocol, Equatable {
   let map: [String: [String]]
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
@@ -18,14 +18,6 @@ struct LanguageMap: Equatable {
         }
       default: throw .invalidLanguageMapValue
       }
-    }
-  }
-
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
-    if case .object(let jsonObject) = jsonValue {
-      try self.init(from: jsonObject)
-    } else {
-      throw .notObject
     }
   }
 }
