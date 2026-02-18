@@ -57,10 +57,9 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
-    self.context =
-      if let context = properties.removeValue(forKey: "@context") {
-        try .init(from: context)
-      } else { nil }
+
+    self.context = try properties.extractContext()
+
     self.id =
       if let id = properties.removeValue(forKey: "@id") {
         if case .string(let value) = id {
@@ -69,14 +68,17 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
           throw .invalidNodeID
         }
       } else { nil }
+
     self.graph =
       if let graph = properties.removeValue(forKey: "@graph") {
         try .init(from: graph)
       } else { nil }
+
     self.type =
       if let type = properties.removeValue(forKey: "@type") {
         try .init(from: type)
       } else { nil }
+
     self.reverse =
       if let reverse = properties.removeValue(forKey: "@reverse") {
         if case .object(let value) = reverse {
@@ -85,14 +87,9 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
           throw .invalidReverse
         }
       } else { nil }
-    self.index =
-      if let index = properties.removeValue(forKey: "@index") {
-        if case .string(let value) = index {
-          value
-        } else {
-          throw .invalidIndex
-        }
-      } else { nil }
+
+    self.index = try properties.extractIndex()
+
     self.properties = properties
   }
 

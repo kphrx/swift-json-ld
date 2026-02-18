@@ -51,10 +51,7 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
     }
     self.value = try .init(from: value)
 
-    self.context =
-      if let context = properties.removeValue(forKey: "@context") {
-        try .init(from: context)
-      } else { nil }
+    self.context = try properties.extractContext()
 
     switch (properties.removeValue(forKey: "@type"), properties.removeValue(forKey: "@language")) {
     case (.some(_), .some(_)): throw .mustNotContainBothTypeAndLanguage
@@ -71,14 +68,7 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
       throw .invalidLanguage
     }
 
-    self.index =
-      if let index = properties.removeValue(forKey: "@index") {
-        if case .string(let value) = index {
-          value
-        } else {
-          throw .invalidIndex
-        }
-      } else { nil }
+    self.index = try properties.extractIndex()
 
     if !properties.isEmpty {
       throw .mustNotContainAnyOtherKeys

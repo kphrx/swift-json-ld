@@ -51,19 +51,8 @@ struct ListObject: JSONLDObjectProtocol, Equatable {
         [try .init(from: listValue)]
       }
 
-    self.context =
-      if let context = properties.removeValue(forKey: "@context") {
-        try .init(from: context)
-      } else { nil }
-
-    self.index =
-      if let indexValue = properties.removeValue(forKey: "@index") {
-        if case .string(let value) = indexValue {
-          value
-        } else {
-          throw .invalidIndex
-        }
-      } else { nil }
+    self.context = try properties.extractContext()
+    self.index = try properties.extractIndex()
 
     if !properties.isEmpty {
       throw .mustNotContainAnyOtherKeys
@@ -89,19 +78,8 @@ struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
         [try .init(from: setValue)]
       }
 
-    self.context =
-      if let context = properties.removeValue(forKey: "@context") {
-        try .init(from: context)
-      } else { nil }
-
-    self.index =
-      if let indexValue = properties.removeValue(forKey: "@index") {
-        if case .string(let value) = indexValue {
-          value
-        } else {
-          throw .invalidIndex
-        }
-      } else { nil }
+    self.context = try properties.extractContext()
+    self.index = try properties.extractIndex()
 
     if !properties.isEmpty {
       throw .mustNotContainAnyOtherKeys
