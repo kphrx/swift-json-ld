@@ -3,7 +3,7 @@
 
 @_exported import JSONCodable
 
-public typealias JSONLDDocument = NodeObjects
+public typealias JSONLDDocument = SingleOrMany<NodeObject>
 
 extension JSONLDDocument: Decodable {
   public init(from decoder: Decoder) throws {

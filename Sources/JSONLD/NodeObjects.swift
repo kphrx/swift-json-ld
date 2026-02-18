@@ -1,56 +1,11 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public indirect enum NodeObjects: JSONLDObjectProtocol, JSONLDArrayProtocol, Equatable {
-  case single(NodeObject)
-  case array([NodeObject])
-
-  init(from jsonObject: JSONObject) throws(JSONLDError) {
-    self = .single(try .init(from: jsonObject))
-  }
-
-  init(from jsonArray: JSONArray) throws(JSONLDError) {
-    self = .array(try jsonArray.map(NodeObject.init(from:)))
-  }
-
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
-    switch jsonValue {
-    case .object(let jsonObject): try self.init(from: jsonObject)
-    case .array(let jsonArray): try self.init(from: jsonArray)
-    default: throw .notObject
-    }
-  }
-}
-
-enum NodeTypes: JSONLDValueProtocol, JSONLDArrayProtocol, Equatable {
-  case single(String)
-  case array([String])
-
-  init(from jsonArray: JSONArray) throws(JSONLDError) {
-    self = .array(
-      try jsonArray.map { jsonValue throws(JSONLDError) in
-        if case .string(let value) = jsonValue {
-          value
-        } else {
-          throw .invalidNodeType
-        }
-      })
-  }
-
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
-    switch jsonValue {
-    case .string(let value): self = .single(value)
-    case .array(let jsonArray): self = try .init(from: jsonArray)
-    default: throw .invalidNodeType
-    }
-  }
-}
-
 public struct NodeObject: JSONLDObjectProtocol, Equatable {
   let context: Contexts?
   let id: String?
-  let graph: NodeObjects?
-  let type: NodeTypes?
+  let graph: SingleOrMany<NodeObject>?
+  let type: SingleOrMany<String>?
   let reverse: JSONObject?
   let index: String?
   let properties: JSONObject
@@ -74,7 +29,15 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
     }
 
     self.type = try properties.removeValue(forKey: "@type").map { typeValue throws(JSONLDError) in
-      try .init(from: typeValue)
+      try .init(
+        from: typeValue,
+        mapper: { jsonValue throws(JSONLDError) in
+          if case .string(let value) = jsonValue {
+            value
+          } else {
+            throw .invalidNodeType
+          }
+        })
     }
 
     self.reverse = try properties.removeValue(forKey: "@reverse").map {

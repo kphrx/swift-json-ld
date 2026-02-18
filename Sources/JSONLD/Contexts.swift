@@ -14,10 +14,13 @@ enum Contexts: JSONLDValueProtocol, Equatable {
 
   init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
-      switch jsonValue {
-      case .array(let jsonArray): try .init(from: jsonArray)
-      case .null: .null
-      default: .single(try .init(from: jsonValue))
+      if case .null = jsonValue {
+        .null
+      } else {
+        switch try SingleOrMany<Context>(from: jsonValue) {
+        case .single(let context): .single(context)
+        case .many(let contexts): .array(contexts)
+        }
       }
   }
 }
