@@ -8,7 +8,6 @@ enum JSONLDError: Error, Equatable {
 
   // `@context`s errors
   case invalidContextValue
-  case invalidIRI(String)
 
   // Node Objects errors
   case invalidNodeID

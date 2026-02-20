@@ -1,8 +1,6 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-import struct Foundation.URL
-
 enum Contexts: JSONLDValueProtocol, Equatable {
   case null
   case single(Context)
@@ -26,13 +24,17 @@ enum Contexts: JSONLDValueProtocol, Equatable {
 }
 
 enum Context: JSONLDObjectProtocol, Equatable {
-  case absolute(URL)
-  case relative(URL)
+  case absoluteIRI(String)
+  case relativeIRI(String)
   case contextDefinition(ContextDefinition)
 
   init(iri value: String) throws(JSONLDError) {
-    guard let url = URL(string: value) else { throw .invalidIRI(value) }
-    self = .absolute(url)
+    self =
+      if value.contains(":") {
+        .absoluteIRI(value)
+      } else {
+        .relativeIRI(value)
+      }
   }
 
   init(from jsonObject: JSONObject) {
