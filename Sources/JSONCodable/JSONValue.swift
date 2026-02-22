@@ -1,6 +1,8 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
+import class Foundation.JSONEncoder
+
 public typealias JSONArray = [JSONValue]
 public typealias JSONObject = [String: JSONValue]
 
@@ -99,5 +101,17 @@ extension JSONValue {
     } else {
       nil
     }
+  }
+}
+
+extension JSONValue: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    if #available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *) {
+      encoder.outputFormatting.insert(.withoutEscapingSlashes)
+    }
+
+    return .init(data: try! encoder.encode(self), encoding: .utf8)!
   }
 }
