@@ -16,6 +16,20 @@ enum IndexedValue: JSONLDValueProtocol, Equatable {
     try jsonArray.map(IndexedValue.init(from:))
   }
 
+  var jsonValue: JSONValue {
+    switch self {
+    case .string(let value): .string(value)
+    case .integer(let value): .integer(value)
+    case .float(let value): .float(value)
+    case .boolean(let value): .boolean(value)
+    case .null: .null
+    case .nodeObject(let nodeObject): nodeObject.jsonValue
+    case .valueObject(let valueObject): valueObject.jsonValue
+    case .listObject(let listObject): listObject.jsonValue
+    case .setObject(let setObject): setObject.jsonValue
+    }
+  }
+
   init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
@@ -34,13 +48,17 @@ enum IndexedValue: JSONLDValueProtocol, Equatable {
         } else {
           try .nodeObject(.init(from: jsonObject))
         }
-      default: throw .invalidIndexedValue
+      default: throw .invalidIndexValue
       }
   }
 }
 
 struct IndexMap: JSONLDObjectProtocol, Equatable {
   let map: [String: [IndexedValue]]
+
+  var jsonObject: JSONObject {
+    self.map.jsonObject
+  }
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in

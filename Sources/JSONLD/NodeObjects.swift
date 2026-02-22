@@ -10,6 +10,32 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
   let index: String?
   let properties: JSONObject
 
+  public var jsonObject: JSONObject {
+    var jsonObject: JSONObject = self.properties
+
+    if let id = self.id {
+      jsonObject["@id"] = .string(id)
+    }
+
+    switch self.graph {
+    case .some(.single(let graph)): jsonObject["@graph"] = graph.jsonValue
+    case .some(.many(let graph)): jsonObject["@graph"] = .array(graph.map { $0.jsonValue })
+    case .none: break
+    }
+
+    switch self.type {
+    case .some(.single(let type)): jsonObject["@type"] = .string(type)
+    case .some(.many(let type)): jsonObject["@type"] = .array(type.map { .string($0) })
+    case .none: break
+    }
+
+    if let index = self.index {
+      jsonObject["@index"] = .string(index)
+    }
+
+    return jsonObject
+  }
+
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
 
@@ -19,7 +45,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
       if case .string(let value) = idValue {
         value
       } else {
-        throw .invalidNodeID
+        throw .invalidIdValue
       }
     }
 
@@ -35,7 +61,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
           if case .string(let value) = jsonValue {
             value
           } else {
-            throw .invalidNodeType
+            throw .invalidTypeValue
           }
         })
     }
@@ -45,7 +71,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
       if case .object(let value) = reverseValue {
         value
       } else {
-        throw .invalidReverse
+        throw .invalidReverseProperty
       }
     }
 
@@ -54,7 +80,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
     self.properties = properties
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     if case .object(let jsonObject) = jsonValue {
       try self.init(from: jsonObject)
     } else {

@@ -14,6 +14,18 @@ enum SetValue: JSONLDValueProtocol, Equatable {
     try jsonArray.map(SetValue.init(from:))
   }
 
+  var jsonValue: JSONValue {
+    switch self {
+    case .string(let value): .string(value)
+    case .integer(let value): .integer(value)
+    case .float(let value): .float(value)
+    case .boolean(let value): .boolean(value)
+    case .null: .null
+    case .nodeObject(let nodeObject): nodeObject.jsonValue
+    case .valueObject(let valueObject): valueObject.jsonValue
+    }
+  }
+
   init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
@@ -28,7 +40,7 @@ enum SetValue: JSONLDValueProtocol, Equatable {
         } else {
           try .nodeObject(.init(from: jsonObject))
         }
-      default: throw .invalidSetValue
+      default: throw .listOfLists
       }
   }
 }
@@ -38,10 +50,24 @@ struct ListObject: JSONLDObjectProtocol, Equatable {
   let context: Contexts?
   let index: String?
 
+  var jsonObject: JSONObject {
+    var jsonObject = ["@list": self.list.jsonValue]
+
+    if let context = self.context {
+      jsonObject["@context"] = context.jsonValue
+    }
+
+    if let index = self.index {
+      jsonObject["@index"] = .string(index)
+    }
+
+    return jsonObject
+  }
+
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     guard let listValue = properties.removeValue(forKey: "@list") else {
-      throw .missingValue
+      throw .invalidSetOrListObject
     }
 
     self.list =
@@ -55,7 +81,7 @@ struct ListObject: JSONLDObjectProtocol, Equatable {
     self.index = try properties.extractIndex()
 
     if !properties.isEmpty {
-      throw .mustNotContainAnyOtherKeys
+      throw .invalidSetOrListObject
     }
   }
 }
@@ -65,10 +91,24 @@ struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
   let context: Contexts?
   let index: String?
 
+  var jsonObject: JSONObject {
+    var jsonObject = ["@set": self.set.jsonValue]
+
+    if let context = self.context {
+      jsonObject["@context"] = context.jsonValue
+    }
+
+    if let index = self.index {
+      jsonObject["@index"] = .string(index)
+    }
+
+    return jsonObject
+  }
+
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     guard let setValue = properties.removeValue(forKey: "@set") else {
-      throw .missingValue
+      throw .invalidSetOrListObject
     }
 
     self.set =
@@ -82,7 +122,7 @@ struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
     self.index = try properties.extractIndex()
 
     if !properties.isEmpty {
-      throw .mustNotContainAnyOtherKeys
+      throw .invalidSetOrListObject
     }
   }
 }

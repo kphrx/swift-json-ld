@@ -26,7 +26,10 @@ let package = Package(
     ),
     .testTarget(
       name: "JSONLDTests",
-      dependencies: ["JSONLD"]
+      dependencies: ["JSONLD"],
+      resources: [
+        .copy("Resources/Fixtures/")
+      ]
     ),
   ]
 )

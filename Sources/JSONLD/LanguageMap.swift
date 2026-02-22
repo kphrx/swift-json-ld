@@ -4,6 +4,10 @@
 struct LanguageMap: JSONLDObjectProtocol, Equatable {
   let map: [String: [String]]
 
+  var jsonObject: JSONObject {
+    self.map.jsonObject
+  }
+
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
       switch jsonValue {

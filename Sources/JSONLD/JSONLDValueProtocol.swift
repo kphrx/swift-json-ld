@@ -1,15 +1,15 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-protocol JSONLDValueProtocol {
+public protocol JSONLDValueProtocol: CustomJSONValueConvertible {
   init(from jsonValue: JSONValue) throws(JSONLDError)
 }
 
-protocol JSONLDArrayProtocol: JSONLDValueProtocol {
+protocol JSONLDArrayProtocol: JSONLDValueProtocol, CustomJSONArrayConvertible {
   init(from jsonArray: JSONArray) throws(JSONLDError)
 }
 
-protocol JSONLDObjectProtocol: JSONLDValueProtocol {
+protocol JSONLDObjectProtocol: JSONLDValueProtocol, CustomJSONObjectConvertible {
   init(from jsonObject: JSONObject) throws(JSONLDError)
 }
 

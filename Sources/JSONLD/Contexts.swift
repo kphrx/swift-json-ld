@@ -6,6 +6,14 @@ enum Contexts: JSONLDValueProtocol, Equatable {
   case single(Context)
   case array([Context])
 
+  var jsonValue: JSONValue {
+    switch self {
+    case .null: .null
+    case .single(let context): context.jsonValue
+    case .array(let contexts): contexts.jsonValue
+    }
+  }
+
   init(from jsonArray: JSONArray) throws(JSONLDError) {
     self = .array(try jsonArray.map(Context.init(from:)))
   }
@@ -23,10 +31,17 @@ enum Contexts: JSONLDValueProtocol, Equatable {
   }
 }
 
-enum Context: JSONLDObjectProtocol, Equatable {
+enum Context: JSONLDValueProtocol, Equatable {
   case absoluteIRI(String)
   case relativeIRI(String)
   case contextDefinition(ContextDefinition)
+
+  var jsonValue: JSONValue {
+    switch self {
+    case .absoluteIRI(let value), .relativeIRI(let value): .string(value)
+    case .contextDefinition(let contextDefinition): contextDefinition.jsonValue
+    }
+  }
 
   init(iri value: String) throws(JSONLDError) {
     self =
@@ -46,15 +61,15 @@ enum Context: JSONLDObjectProtocol, Equatable {
       switch jsonValue {
       case .object(let jsonObject): .init(from: jsonObject)
       case .string(let value): try .init(iri: value)
-      default: throw .invalidContextValue
+      default: throw .invalidLocalContext
       }
   }
 }
 
 struct ContextDefinition: JSONLDObjectProtocol, Equatable {
-  private let rawValue: JSONObject
+  let jsonObject: JSONObject
 
   init(from jsonObject: JSONObject) {
-    self.rawValue = jsonObject
+    self.jsonObject = jsonObject
   }
 }
