@@ -6,7 +6,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
   let id: String?
   let graph: SingleOrMany<NodeObject>?
   let type: SingleOrMany<String>?
-  let reverse: JSONObject?
+  let reverse: ReversePropertyMap?
   let index: String?
   let properties: JSONObject
 
@@ -27,6 +27,10 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
     case .some(.single(let type)): jsonObject["@type"] = .string(type)
     case .some(.many(let type)): jsonObject["@type"] = .array(type.map { .string($0) })
     case .none: break
+    }
+
+    if let reverse = self.reverse {
+      jsonObject["@reverse"] = reverse.jsonValue
     }
 
     if let index = self.index {
@@ -69,9 +73,9 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
     self.reverse = try properties.removeValue(forKey: "@reverse").map {
       reverseValue throws(JSONLDError) in
       if case .object(let value) = reverseValue {
-        value
+        try .init(from: value)
       } else {
-        throw .invalidReverseProperty
+        throw .invalidReverseValue
       }
     }
 
