@@ -35,7 +35,9 @@ enum SetValue: JSONLDValueProtocol, Equatable {
       case .boolean(let value): .boolean(value)
       case .null: .null
       case .object(let jsonObject):
-        if jsonObject.keys.contains("@value") {
+        if jsonObject.keys.contains("@list") {
+          throw .listOfLists
+        } else if jsonObject.keys.contains("@value") {
           try .valueObject(.init(from: jsonObject))
         } else {
           try .nodeObject(.init(from: jsonObject))
@@ -46,7 +48,7 @@ enum SetValue: JSONLDValueProtocol, Equatable {
 }
 
 struct ListObject: JSONLDObjectProtocol, Equatable {
-  let list: [SetValue]
+  let list: SingleOrMany<SetValue>
   let context: Contexts?
   let index: String?
 
@@ -70,12 +72,7 @@ struct ListObject: JSONLDObjectProtocol, Equatable {
       throw .invalidSetOrListObject
     }
 
-    self.list =
-      if case .array(let array) = listValue {
-        try SetValue.from(array)
-      } else {
-        [try .init(from: listValue)]
-      }
+    self.list = try .init(from: listValue)
 
     self.context = try properties.extractContext()
     self.index = try properties.extractIndex()
@@ -87,7 +84,7 @@ struct ListObject: JSONLDObjectProtocol, Equatable {
 }
 
 struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
-  let set: [SetValue]
+  let set: SingleOrMany<SetValue>
   let context: Contexts?
   let index: String?
 
@@ -111,12 +108,7 @@ struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
       throw .invalidSetOrListObject
     }
 
-    self.set =
-      if case .array(let array) = setValue {
-        try SetValue.from(array)
-      } else {
-        [try .init(from: setValue)]
-      }
+    self.set = try .init(from: setValue)
 
     self.context = try properties.extractContext()
     self.index = try properties.extractIndex()

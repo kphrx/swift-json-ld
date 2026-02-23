@@ -54,7 +54,7 @@ enum IndexedValue: JSONLDValueProtocol, Equatable {
 }
 
 struct IndexMap: JSONLDObjectProtocol, Equatable {
-  let map: [String: [IndexedValue]]
+  let map: [String: SingleOrMany<IndexedValue>]
 
   var jsonObject: JSONObject {
     self.map.jsonObject
@@ -62,11 +62,7 @@ struct IndexMap: JSONLDObjectProtocol, Equatable {
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
-      if case .array(let array) = jsonValue {
-        try IndexedValue.from(array)
-      } else {
-        [try .init(from: jsonValue)]
-      }
+      try .init(from: jsonValue)
     }
   }
 }

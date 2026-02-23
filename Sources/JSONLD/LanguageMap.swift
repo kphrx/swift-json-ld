@@ -1,8 +1,28 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
+enum LanguageMapValue: JSONLDValueProtocol, Equatable {
+  case string(String)
+  case null
+
+  var jsonValue: JSONValue {
+    switch self {
+    case .string(let value): .string(value)
+    case .null: .null
+    }
+  }
+
+  init(from jsonValue: JSONValue) throws(JSONLDError) {
+    switch jsonValue {
+    case .string(let value): self = .string(value)
+    case .null: self = .null
+    default: throw .invalidLanguageMapValue
+    }
+  }
+}
+
 struct LanguageMap: JSONLDObjectProtocol, Equatable {
-  let map: [String: [String]]
+  let map: [String: SingleOrMany<LanguageMapValue>]
 
   var jsonObject: JSONObject {
     self.map.jsonObject
@@ -10,18 +30,7 @@ struct LanguageMap: JSONLDObjectProtocol, Equatable {
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
-      switch jsonValue {
-      case .string(let string): [string]
-      case .array(let array):
-        try array.map { value throws(JSONLDError) in
-          if case .string(let string) = value {
-            string
-          } else {
-            throw .invalidLanguageMapValue
-          }
-        }
-      default: throw .invalidLanguageMapValue
-      }
+      try .init(from: jsonValue)
     }
   }
 }
