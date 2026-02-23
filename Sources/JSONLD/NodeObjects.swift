@@ -8,10 +8,10 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
   let type: SingleOrMany<String>?
   let reverse: ReversePropertyMap?
   let index: String?
-  let properties: JSONObject
+  let properties: [String: SingleOrMany<JSONLDValue>]
 
   public var jsonObject: JSONObject {
-    var jsonObject: JSONObject = self.properties
+    var jsonObject: JSONObject = self.properties.mapValues { $0.jsonValue }
 
     if let id = self.id {
       jsonObject["@id"] = .string(id)
@@ -89,7 +89,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
       throw .internalError(.notNodeObject)
     }
 
-    self.properties = properties
+    self.properties = try properties.mapValuesWithTypedThrows(SingleOrMany<JSONLDValue>.init(from:))
   }
 
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
