@@ -36,13 +36,13 @@ struct CompactionTests {
     "[Compaction] Negative Evaluation Test with processingMode 1.0",
     arguments: TestCaseLoader.compactionTestsNegativeCases(version: .v1p0))
   func negativeEvaluationTestOneZero(testCase: CompactTest.NegativeCase) throws {
-    guard let expectError = JSONLDError(rawValue: testCase.expectErrorCode) else {
+    guard let expectError = JSONLDError.Code(rawValue: testCase.expectErrorCode) else {
       Issue.record(
         "Missing JSONLDError case for expected error code: '\(testCase.expectErrorCode)'")
       return
     }
 
-    #expect(throws: expectError) {
+    #expect(throws: JSONLDError.code(expectError)) {
       let document = try TestCaseLoader.load(testCase.input, type: JSONLDDocument.self)
       let context = try TestCaseLoader.load(
         testCase.options.contextFilename, type: JSONLDDocument.self)

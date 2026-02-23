@@ -16,7 +16,7 @@ enum LanguageMapValue: JSONLDValueProtocol, Equatable {
     switch jsonValue {
     case .string(let value): self = .string(value)
     case .null: self = .null
-    default: throw .invalidLanguageMapValue
+    default: throw .code(.invalidLanguageMapValue)
     }
   }
 }

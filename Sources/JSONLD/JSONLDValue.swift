@@ -52,6 +52,8 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
         || jsonObject["@context"] != nil
       {
         self = .node(try .init(from: jsonObject))
+      } else if jsonObject["@language"] != nil {
+        throw .internalError(.notJSONLDValue)
       } else if !jsonObject.keys.contains(where: { $0.hasPrefix("@") }) {
         if let languageMap = try? LanguageMap(from: jsonValue) {
           self = .languageMap(languageMap)
@@ -63,7 +65,7 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
       } else {
         self = .value(try .init(from: jsonObject))
       }
-    default: throw .invalidValueObject
+    default: throw .internalError(.notJSONLDValue)
     }
   }
 }

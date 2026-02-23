@@ -13,13 +13,13 @@ struct ReversePropertyMap: JSONLDObjectProtocol, Equatable {
 
     for (key, value) in jsonObject {
       if key.hasPrefix("@") {
-        throw .invalidReversePropertyMap
+        throw .code(.invalidReversePropertyMap)
       }
 
       switch value {
       case .object(let object):
         if object.keys.contains("@value") || object.keys.contains("@list") {
-          throw .invalidReversePropertyValue
+          throw .code(.invalidReversePropertyValue)
         }
         map[key] = try .init(from: value)
       case .array(let array):
@@ -28,16 +28,16 @@ struct ReversePropertyMap: JSONLDObjectProtocol, Equatable {
         for element in array {
           if case .object(let object) = element {
             if object.keys.contains("@value") || object.keys.contains("@list") {
-              throw .invalidReversePropertyValue
+              throw .code(.invalidReversePropertyValue)
             }
             nodes.append(try .init(from: element))
           } else {
-            throw .invalidReversePropertyValue
+            throw .code(.invalidReversePropertyValue)
           }
         }
         map[key] = .many(nodes)
       default:
-        throw .invalidReversePropertyValue
+        throw .code(.invalidReversePropertyValue)
       }
     }
 

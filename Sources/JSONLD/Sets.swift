@@ -36,13 +36,13 @@ enum SetValue: JSONLDValueProtocol, Equatable {
       case .null: .null
       case .object(let jsonObject):
         if jsonObject.keys.contains("@list") {
-          throw .listOfLists
+          throw .code(.listOfLists)
         } else if jsonObject.keys.contains("@value") {
           try .valueObject(.init(from: jsonObject))
         } else {
           try .nodeObject(.init(from: jsonObject))
         }
-      default: throw .listOfLists
+      default: throw .code(.listOfLists)
       }
   }
 }
@@ -69,7 +69,7 @@ struct ListObject: JSONLDObjectProtocol, Equatable {
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     guard let listValue = properties.removeValue(forKey: "@list") else {
-      throw .invalidSetOrListObject
+      throw .code(.invalidSetOrListObject)
     }
 
     self.list = try .init(from: listValue)
@@ -78,7 +78,7 @@ struct ListObject: JSONLDObjectProtocol, Equatable {
     self.index = try properties.extractIndex()
 
     if !properties.isEmpty {
-      throw .invalidSetOrListObject
+      throw .code(.invalidSetOrListObject)
     }
   }
 }
@@ -105,7 +105,7 @@ struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     guard let setValue = properties.removeValue(forKey: "@set") else {
-      throw .invalidSetOrListObject
+      throw .code(.invalidSetOrListObject)
     }
 
     self.set = try .init(from: setValue)
@@ -114,7 +114,7 @@ struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
     self.index = try properties.extractIndex()
 
     if !properties.isEmpty {
-      throw .invalidSetOrListObject
+      throw .code(.invalidSetOrListObject)
     }
   }
 }

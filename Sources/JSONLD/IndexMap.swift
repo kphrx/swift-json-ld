@@ -48,7 +48,7 @@ enum IndexedValue: JSONLDValueProtocol, Equatable {
         } else {
           try .nodeObject(.init(from: jsonObject))
         }
-      default: throw .invalidIndexValue
+      default: throw .code(.invalidIndexValue)
       }
   }
 }

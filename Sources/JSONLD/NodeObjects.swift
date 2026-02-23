@@ -49,7 +49,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
       if case .string(let value) = idValue {
         value
       } else {
-        throw .invalidIdValue
+        throw .code(.invalidIdValue)
       }
     }
 
@@ -65,7 +65,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
           if case .string(let value) = jsonValue {
             value
           } else {
-            throw .invalidTypeValue
+            throw .code(.invalidTypeValue)
           }
         })
     }
@@ -75,18 +75,18 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
       if case .object(let value) = reverseValue {
         try .init(from: value)
       } else {
-        throw .invalidReverseValue
+        throw .code(.invalidReverseValue)
       }
     }
 
     self.index = try properties.extractIndex()
 
     if properties.keys.contains("@value") || properties.keys.contains("@language") {
-      throw .invalidValueObject
+      throw .internalError(.notNodeObject)
     }
 
     if properties.keys.contains("@list") || properties.keys.contains("@set") {
-      throw .invalidSetOrListObject
+      throw .internalError(.notNodeObject)
     }
 
     self.properties = properties
@@ -96,7 +96,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
     if case .object(let jsonObject) = jsonValue {
       try self.init(from: jsonObject)
     } else {
-      throw .notObject
+      throw .internalError(.notObject)
     }
   }
 }

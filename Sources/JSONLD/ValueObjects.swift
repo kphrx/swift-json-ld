@@ -23,10 +23,10 @@ enum ValueType: JSONLDValueProtocol, Equatable {
       switch jsonValue {
       case .string(let value): .term(value)
       case .null: .null
-      default: throw .invalidTypedValue
+      default: throw .code(.invalidTypedValue)
       }
     if case .term(let value) = self, value.hasPrefix("_:") {
-      throw .invalidTypedValue
+      throw .code(.invalidTypedValue)
     }
   }
 }
@@ -57,7 +57,7 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
         case .float(let value): .float(value)
         case .boolean(let value): .boolean(value)
         case .null: .null
-        default: throw .invalidValueObjectValue
+        default: throw .code(.invalidValueObjectValue)
         }
     }
   }
@@ -91,10 +91,10 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
-    guard let value = properties.removeValue(forKey: "@value") else {
-      throw .invalidValueObject
-    }
-    self.value = try .init(from: value)
+    self.value =
+      if let value = properties.removeValue(forKey: "@value") {
+        try .init(from: value)
+      } else { nil }
 
     self.context = try properties.extractContext()
 
@@ -103,7 +103,7 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
 
     if let languageValue {
       guard case .string(let language) = languageValue else {
-        throw .invalidLanguageTaggedString
+        throw .code(.invalidLanguageTaggedString)
       }
       self.language = language
     } else {
@@ -112,7 +112,7 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
 
     if let typeValue {
       if languageValue != nil {
-        throw .invalidValueObject
+        throw .code(.invalidValueObject)
       }
       self.type = try .init(from: typeValue)
     } else {
@@ -122,13 +122,14 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
     self.index = try properties.extractIndex()
 
     if !properties.isEmpty {
-      throw .invalidValueObject
+      throw .code(.invalidValueObject)
     }
 
     if self.language != nil {
       switch self.value {
-      case .string: break
-      default: throw .invalidLanguageTaggedValue
+      case .some(.string): break
+      case .some: throw .code(.invalidLanguageTaggedValue)
+      case .none: break
       }
     }
   }

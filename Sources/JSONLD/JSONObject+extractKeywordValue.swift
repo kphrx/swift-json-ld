@@ -13,7 +13,7 @@ extension JSONObject {
       if case .string(let value) = indexValue {
         value
       } else {
-        throw .invalidIndexValue
+        throw .code(.invalidIndexValue)
       }
     }
   }

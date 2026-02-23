@@ -36,13 +36,13 @@ struct ExpansionTests {
     "[Expansion] Negative Evaluation Test with processingMode 1.0",
     arguments: TestCaseLoader.expansionTestsNegativeCases(version: .v1p0))
   func negativeEvaluationTestOneZero(testCase: ExpandTest.NegativeCase) throws {
-    guard let expectError = JSONLDError(rawValue: testCase.expectErrorCode) else {
+    guard let expectError = JSONLDError.Code(rawValue: testCase.expectErrorCode) else {
       Issue.record(
         "Missing JSONLDError case for expected error code: '\(testCase.expectErrorCode)'")
       return
     }
 
-    #expect(throws: expectError) {
+    #expect(throws: JSONLDError.code(expectError)) {
       let document = try TestCaseLoader.load(testCase.input, type: JSONLDDocument.self)
       let expandContext = try testCase.options.expandContextFilename.map { filename in
         try TestCaseLoader.load(filename, type: JSONLDDocument.self)

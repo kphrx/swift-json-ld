@@ -18,7 +18,7 @@ extension JSONLDValueProtocol where Self: JSONLDObjectProtocol {
     if case .object(let jsonObject) = jsonValue {
       try self.init(from: jsonObject)
     } else {
-      throw .notObject
+      throw .internalError(.notObject)
     }
   }
 }
@@ -28,7 +28,7 @@ extension JSONLDValueProtocol where Self: JSONLDArrayProtocol {
     if case .array(let jsonArray) = jsonValue {
       try self.init(from: jsonArray)
     } else {
-      throw .notObject
+      throw .internalError(.notObject)
     }
   }
 }

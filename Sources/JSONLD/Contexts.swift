@@ -61,7 +61,7 @@ enum Context: JSONLDValueProtocol, Equatable {
       switch jsonValue {
       case .object(let jsonObject): .init(from: jsonObject)
       case .string(let value): try .init(iri: value)
-      default: throw .invalidLocalContext
+      default: throw .code(.invalidLocalContext)
       }
   }
 }
