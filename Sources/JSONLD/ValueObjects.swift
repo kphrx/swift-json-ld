@@ -25,6 +25,9 @@ enum ValueType: JSONLDValueProtocol, Equatable {
       case .null: .null
       default: throw .invalidTypedValue
       }
+    if case .term(let value) = self, value.hasPrefix("_:") {
+      throw .invalidTypedValue
+    }
   }
 }
 
@@ -88,32 +91,45 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
-    self.value =
-      if let value = properties.removeValue(forKey: "@value") {
-        try .init(from: value)
-      } else { nil }
+    guard let value = properties.removeValue(forKey: "@value") else {
+      throw .invalidValueObject
+    }
+    self.value = try .init(from: value)
 
     self.context = try properties.extractContext()
 
-    switch (properties.removeValue(forKey: "@type"), properties.removeValue(forKey: "@language")) {
-    case (.some(_), .some(_)): throw .invalidValueObject
-    case (.none, .none):
-      self.type = nil
-      self.language = nil
-    case (.some(let type), .none):
-      self.type = try .init(from: type)
-      self.language = nil
-    case (.none, .some(.string(let language))):
-      self.type = nil
+    let typeValue = properties.removeValue(forKey: "@type")
+    let languageValue = properties.removeValue(forKey: "@language")
+
+    if let languageValue {
+      guard case .string(let language) = languageValue else {
+        throw .invalidLanguageTaggedString
+      }
       self.language = language
-    default:
-      throw .invalidValueObject
+    } else {
+      self.language = nil
+    }
+
+    if let typeValue {
+      if languageValue != nil {
+        throw .invalidValueObject
+      }
+      self.type = try .init(from: typeValue)
+    } else {
+      self.type = nil
     }
 
     self.index = try properties.extractIndex()
 
     if !properties.isEmpty {
       throw .invalidValueObject
+    }
+
+    if self.language != nil {
+      switch self.value {
+      case .string: break
+      default: throw .invalidLanguageTaggedValue
+      }
     }
   }
 }

@@ -81,6 +81,14 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
 
     self.index = try properties.extractIndex()
 
+    if properties.keys.contains("@value") || properties.keys.contains("@language") {
+      throw .invalidValueObject
+    }
+
+    if properties.keys.contains("@list") || properties.keys.contains("@set") {
+      throw .invalidSetOrListObject
+    }
+
     self.properties = properties
   }
 
