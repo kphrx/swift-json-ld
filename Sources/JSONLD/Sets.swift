@@ -36,13 +36,16 @@ enum SetValue: JSONLDValueProtocol, Equatable {
       case .null: .null
       case .object(let jsonObject):
         if jsonObject.keys.contains("@list") {
+          // NOTE: JSON-LD 1.1 allows lists of lists; keep this for json-ld-1.0 only.
           throw .code(.listOfLists)
         } else if jsonObject.keys.contains("@value") {
           try .valueObject(.init(from: jsonObject))
         } else {
           try .nodeObject(.init(from: jsonObject))
         }
-      default: throw .code(.listOfLists)
+      default:
+        // NOTE: JSON-LD 1.1 allows lists of lists; keep this for json-ld-1.0 only.
+        throw .code(.listOfLists)
       }
   }
 }
