@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-enum JSONLDKeyword: String, CaseIterable {
+enum JSONLDKeyword: String, CaseIterable, JSONLDValueProtocol {
   case base = "@base"
   case container = "@container"
   case context = "@context"
@@ -25,6 +25,19 @@ enum JSONLDKeyword: String, CaseIterable {
   case value = "@value"
   case version = "@version"
   case vocab = "@vocab"
+
+  var jsonValue: JSONValue {
+    .string(self.rawValue)
+  }
+
+  init(from jsonValue: JSONValue) throws(JSONLDError) {
+    guard case .string(let value) = jsonValue,
+      let keyword = JSONLDKeyword(rawValue: value)
+    else {
+      throw .internalError(.notKeyword)
+    }
+    self = keyword
+  }
 }
 
 extension JSONObject {

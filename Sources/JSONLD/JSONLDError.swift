@@ -57,6 +57,7 @@ public enum JSONLDError: Error, Equatable {
     case notNodeObject
     case notValueObject
     case notSetOrListObject
+    case notKeyword
   }
 }
 
@@ -70,6 +71,7 @@ extension JSONLDError: CustomStringConvertible {
       case .notNodeObject: "not a node object"
       case .notValueObject: "not a value object"
       case .notSetOrListObject: "not a set or list object"
+      case .notKeyword: "not a keyword"
       }
     }
   }
