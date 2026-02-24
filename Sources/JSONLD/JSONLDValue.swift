@@ -5,8 +5,7 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
   case iriOrTerm(String)
   case node(NodeObject)
   case value(ValueObject)
-  case set(SetObject)
-  case list(ListObject)
+  case setOrList(SetOrListObject)
   case languageMap(LanguageMap)
   case indexMap(IndexMap)
   case invalid(InvalidValue)
@@ -25,8 +24,7 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
     case .iriOrTerm(let value): .string(value)
     case .node(let node): node.jsonValue
     case .value(let value): value.jsonValue
-    case .set(let set): set.jsonValue
-    case .list(let list): list.jsonValue
+    case .setOrList(let object): object.jsonValue
     case .languageMap(let languageMap): languageMap.jsonValue
     case .indexMap(let indexMap): indexMap.jsonValue
     case .invalid(let invalid): invalid.jsonValue
@@ -40,19 +38,9 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
     case .object(let jsonObject):
       if jsonObject[.value] != nil {
         self = .value(try .init(from: jsonObject))
-      } else if jsonObject[.set] != nil {
+      } else if jsonObject[.set] != nil || jsonObject[.list] != nil {
         do {
-          self = .set(try .init(from: jsonObject))
-        } catch let jsonldError {
-          if case .code(.listOfLists) = jsonldError {
-            self = .invalid(.listOfLists)
-          } else {
-            throw jsonldError
-          }
-        }
-      } else if jsonObject[.list] != nil {
-        do {
-          self = .list(try .init(from: jsonObject))
+          self = .setOrList(try .init(from: jsonObject))
         } catch let jsonldError {
           if case .code(.listOfLists) = jsonldError {
             self = .invalid(.listOfLists)

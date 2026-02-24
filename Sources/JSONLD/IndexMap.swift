@@ -9,8 +9,7 @@ enum IndexedValue: JSONLDValueProtocol, Equatable {
   case null
   case nodeObject(NodeObject)
   case valueObject(ValueObject)
-  case listObject(ListObject)
-  case setObject(SetObject)
+  case setOrListObject(SetOrListObject)
 
   static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [IndexedValue] {
     try jsonArray.map(IndexedValue.init(from:))
@@ -25,8 +24,7 @@ enum IndexedValue: JSONLDValueProtocol, Equatable {
     case .null: .null
     case .nodeObject(let nodeObject): nodeObject.jsonValue
     case .valueObject(let valueObject): valueObject.jsonValue
-    case .listObject(let listObject): listObject.jsonValue
-    case .setObject(let setObject): setObject.jsonValue
+    case .setOrListObject(let object): object.jsonValue
     }
   }
 
@@ -41,10 +39,8 @@ enum IndexedValue: JSONLDValueProtocol, Equatable {
       case .object(let jsonObject):
         if jsonObject.contains(.value) {
           try .valueObject(.init(from: jsonObject))
-        } else if jsonObject.contains(.list) {
-          try .listObject(.init(from: jsonObject))
-        } else if jsonObject.contains(.set) {
-          try .setObject(.init(from: jsonObject))
+        } else if jsonObject.contains(.list) || jsonObject.contains(.set) {
+          try .setOrListObject(.init(from: jsonObject))
         } else {
           try .nodeObject(.init(from: jsonObject))
         }

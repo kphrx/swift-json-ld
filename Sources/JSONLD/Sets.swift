@@ -50,14 +50,43 @@ enum SetValue: JSONLDValueProtocol, Equatable {
   }
 }
 
-struct ListObject: JSONLDObjectProtocol, Equatable {
-  let list: SingleOrMany<SetValue>
-  let context: Contexts?
-  let index: String?
+enum SetOrListObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
+  case set(SingleOrMany<SetValue>, context: Contexts?, index: String?)
+  case list(SingleOrMany<SetValue>, context: Contexts?, index: String?)
+
+  private var values: SingleOrMany<SetValue> {
+    switch self {
+    case .set(let values, _, _), .list(let values, _, _):
+      values
+    }
+  }
+
+  private var context: Contexts? {
+    switch self {
+    case .set(_, let context, _), .list(_, let context, _):
+      context
+    }
+  }
+
+  private var index: String? {
+    switch self {
+    case .set(_, _, let index), .list(_, _, let index):
+      index
+    }
+  }
+
+  private var keyword: JSONLDKeyword {
+    switch self {
+    case .set:
+      .set
+    case .list:
+      .list
+    }
+  }
 
   var jsonObject: JSONObject {
     var jsonObject: JSONObject = [:]
-    jsonObject[.list] = self.list.jsonValue
+    jsonObject[self.keyword] = self.values.jsonValue
 
     if let context = self.context {
       jsonObject[.context] = context.jsonValue
@@ -72,54 +101,19 @@ struct ListObject: JSONLDObjectProtocol, Equatable {
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
-    guard let listValue = properties.removeValue(for: .list) else {
-      throw .internalError(.notSetOrListObject)
-    }
+    let context = try properties.extractContext()
+    let index = try properties.extractIndex()
 
-    self.list = try .init(from: listValue)
-
-    self.context = try properties.extractContext()
-    self.index = try properties.extractIndex()
-
-    if !properties.isEmpty {
-      throw .code(.invalidSetOrListObject)
-    }
-  }
-}
-
-struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
-  let set: SingleOrMany<SetValue>
-  let context: Contexts?
-  let index: String?
-
-  var jsonObject: JSONObject {
-    var jsonObject: JSONObject = [:]
-    jsonObject[.set] = self.set.jsonValue
-
-    if let context = self.context {
-      jsonObject[.context] = context.jsonValue
-    }
-
-    if let index = self.index {
-      jsonObject[.index] = .string(index)
-    }
-
-    return jsonObject
-  }
-
-  init(from jsonObject: JSONObject) throws(JSONLDError) {
-    var properties = jsonObject
-    guard let setValue = properties.removeValue(for: .set) else {
-      throw .internalError(.notSetOrListObject)
-    }
-
-    self.set = try .init(from: setValue)
-
-    self.context = try properties.extractContext()
-    self.index = try properties.extractIndex()
-
-    if !properties.isEmpty {
-      throw .code(.invalidSetOrListObject)
-    }
+    self =
+      switch (
+        properties.removeValue(for: .set), properties.removeValue(for: .list), properties.isEmpty
+      ) {
+      case (.none, .none, _): throw .internalError(.notSetOrListObject)
+      case (.some(let setValue), .none, true):
+        .set(try .init(from: setValue), context: context, index: index)
+      case (.none, .some(let listValue), true):
+        .list(try .init(from: listValue), context: context, index: index)
+      default: throw .code(.invalidSetOrListObject)
+      }
   }
 }
