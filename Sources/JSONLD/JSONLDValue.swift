@@ -82,13 +82,7 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
       } else if jsonObject[.language] != nil {
         self = .invalid(.notJSONLDValue)
       } else if !jsonObject.keys.contains(where: { $0.hasPrefix("@") }) {
-        if let languageMap = try? LanguageMap(from: jsonValue) {
-          self = .languageMap(languageMap)
-        } else if let indexMap = try? IndexMap(from: jsonValue) {
-          self = .indexMap(indexMap)
-        } else {
-          self = .value(try .init(from: jsonObject))
-        }
+        self = .node(try .init(from: jsonObject))
       } else {
         self = .value(try .init(from: jsonObject))
       }
