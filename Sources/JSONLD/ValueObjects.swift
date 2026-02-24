@@ -2,18 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 enum ValueType: JSONLDValueProtocol, Equatable {
-  case term(String)
-  case compactIRI(String)
-  case absoluteIRI(String)
-  case relativeIRI(String)
+  case iriOrTerm(String)
   case null
 
   var jsonValue: JSONValue {
     switch self {
-    case .term(let value): .string(value)
-    case .compactIRI(let value): .string(value)
-    case .absoluteIRI(let value): .string(value)
-    case .relativeIRI(let value): .string(value)
+    case .iriOrTerm(let value): .string(value)
     case .null: .null
     }
   }
@@ -21,11 +15,11 @@ enum ValueType: JSONLDValueProtocol, Equatable {
   init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
-      case .string(let value): .term(value)
+      case .string(let value): .iriOrTerm(value)
       case .null: .null
       default: throw .code(.invalidTypedValue)
       }
-    if case .term(let value) = self, value.hasPrefix("_:") {
+    if case .iriOrTerm(let value) = self, value.hasPrefix("_:") {
       throw .code(.invalidTypedValue)
     }
   }

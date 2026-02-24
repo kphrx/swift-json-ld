@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
-  case term(String)
-  case compactIRI(String)
-  case absoluteIRI(String)
-  case relativeIRI(String)
+  case iriOrTerm(String)
   case node(NodeObject)
   case value(ValueObject)
   case set(SetObject)
@@ -25,8 +22,7 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
 
   var jsonValue: JSONValue {
     switch self {
-    case .term(let term): .string(term)
-    case .compactIRI(let iri), .absoluteIRI(let iri), .relativeIRI(let iri): .string(iri)
+    case .iriOrTerm(let value): .string(value)
     case .node(let node): node.jsonValue
     case .value(let value): value.jsonValue
     case .set(let set): set.jsonValue
@@ -40,15 +36,7 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
   init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
     case .string(let string):
-      if string.contains(":") {
-        self = .compactIRI(string)
-      } else if string.hasPrefix("/") || string.hasPrefix("./") || string.hasPrefix("../") {
-        self = .relativeIRI(string)
-      } else if string.contains("://") {
-        self = .absoluteIRI(string)
-      } else {
-        self = .term(string)
-      }
+      self = .iriOrTerm(string)
     case .object(let jsonObject):
       if jsonObject[.value] != nil {
         self = .value(try .init(from: jsonObject))
