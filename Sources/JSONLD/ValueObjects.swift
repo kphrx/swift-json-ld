@@ -71,19 +71,19 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
     var jsonObject: JSONObject = [:]
 
     if let value = self.value {
-      jsonObject["@value"] = value.jsonValue
+      jsonObject[.value] = value.jsonValue
     }
 
     if let type = self.type {
-      jsonObject["@type"] = type.jsonValue
+      jsonObject[.type] = type.jsonValue
     }
 
     if let language = self.language {
-      jsonObject["@language"] = .string(language)
+      jsonObject[.language] = .string(language)
     }
 
     if let index = self.index {
-      jsonObject["@index"] = .string(index)
+      jsonObject[.index] = .string(index)
     }
 
     return jsonObject
@@ -92,14 +92,14 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     self.value =
-      if let value = properties.removeValue(forKey: "@value") {
+      if let value = properties.removeValue(for: .value) {
         try .init(from: value)
       } else { nil }
 
     self.context = try properties.extractContext()
 
-    let typeValue = properties.removeValue(forKey: "@type")
-    let languageValue = properties.removeValue(forKey: "@language")
+    let typeValue = properties.removeValue(for: .type)
+    let languageValue = properties.removeValue(for: .language)
 
     if let languageValue {
       guard case .string(let language) = languageValue else {

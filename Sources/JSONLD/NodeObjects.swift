@@ -14,27 +14,31 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
     var jsonObject: JSONObject = self.properties.mapValues { $0.jsonValue }
 
     if let id = self.id {
-      jsonObject["@id"] = .string(id)
+      jsonObject[.id] = .string(id)
     }
 
     switch self.graph {
-    case .some(.single(let graph)): jsonObject["@graph"] = graph.jsonValue
-    case .some(.many(let graph)): jsonObject["@graph"] = .array(graph.map { $0.jsonValue })
+    case .some(.single(let graph)):
+      jsonObject[.graph] = graph.jsonValue
+    case .some(.many(let graph)):
+      jsonObject[.graph] = .array(graph.map { $0.jsonValue })
     case .none: break
     }
 
     switch self.type {
-    case .some(.single(let type)): jsonObject["@type"] = .string(type)
-    case .some(.many(let type)): jsonObject["@type"] = .array(type.map { .string($0) })
+    case .some(.single(let type)):
+      jsonObject[.type] = .string(type)
+    case .some(.many(let type)):
+      jsonObject[.type] = .array(type.map { .string($0) })
     case .none: break
     }
 
     if let reverse = self.reverse {
-      jsonObject["@reverse"] = reverse.jsonValue
+      jsonObject[.reverse] = reverse.jsonValue
     }
 
     if let index = self.index {
-      jsonObject["@index"] = .string(index)
+      jsonObject[.index] = .string(index)
     }
 
     return jsonObject
@@ -45,7 +49,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
 
     self.context = try properties.extractContext()
 
-    self.id = try properties.removeValue(forKey: "@id").map { idValue throws(JSONLDError) in
+    self.id = try properties.removeValue(for: .id).map { idValue throws(JSONLDError) in
       if case .string(let value) = idValue {
         value
       } else {
@@ -53,12 +57,12 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
       }
     }
 
-    self.graph = try properties.removeValue(forKey: "@graph").map {
+    self.graph = try properties.removeValue(for: .graph).map {
       graphValue throws(JSONLDError) in
       try .init(from: graphValue)
     }
 
-    self.type = try properties.removeValue(forKey: "@type").map { typeValue throws(JSONLDError) in
+    self.type = try properties.removeValue(for: .type).map { typeValue throws(JSONLDError) in
       try .init(
         from: typeValue,
         mapper: { jsonValue throws(JSONLDError) in
@@ -70,7 +74,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
         })
     }
 
-    self.reverse = try properties.removeValue(forKey: "@reverse").map {
+    self.reverse = try properties.removeValue(for: .reverse).map {
       reverseValue throws(JSONLDError) in
       if case .object(let value) = reverseValue {
         try .init(from: value)
@@ -81,11 +85,15 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
 
     self.index = try properties.extractIndex()
 
-    if properties.keys.contains("@value") || properties.keys.contains("@language") {
+    if properties.contains(.value)
+      || properties.contains(.language)
+    {
       throw .internalError(.notNodeObject)
     }
 
-    if properties.keys.contains("@list") || properties.keys.contains("@set") {
+    if properties.contains(.list)
+      || properties.contains(.set)
+    {
       throw .internalError(.notNodeObject)
     }
 

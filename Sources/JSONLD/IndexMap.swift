@@ -39,11 +39,11 @@ enum IndexedValue: JSONLDValueProtocol, Equatable {
       case .boolean(let value): .boolean(value)
       case .null: .null
       case .object(let jsonObject):
-        if jsonObject.keys.contains("@value") {
+        if jsonObject.contains(.value) {
           try .valueObject(.init(from: jsonObject))
-        } else if jsonObject.keys.contains("@list") {
+        } else if jsonObject.contains(.list) {
           try .listObject(.init(from: jsonObject))
-        } else if jsonObject.keys.contains("@set") {
+        } else if jsonObject.contains(.set) {
           try .setObject(.init(from: jsonObject))
         } else {
           try .nodeObject(.init(from: jsonObject))

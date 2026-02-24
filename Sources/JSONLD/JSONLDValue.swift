@@ -50,9 +50,9 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
         self = .term(string)
       }
     case .object(let jsonObject):
-      if jsonObject["@value"] != nil {
+      if jsonObject[.value] != nil {
         self = .value(try .init(from: jsonObject))
-      } else if jsonObject["@set"] != nil {
+      } else if jsonObject[.set] != nil {
         do {
           self = .set(try .init(from: jsonObject))
         } catch let jsonldError {
@@ -62,7 +62,7 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
             throw jsonldError
           }
         }
-      } else if jsonObject["@list"] != nil {
+      } else if jsonObject[.list] != nil {
         do {
           self = .list(try .init(from: jsonObject))
         } catch let jsonldError {
@@ -72,14 +72,14 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
             throw jsonldError
           }
         }
-      } else if jsonObject["@id"] != nil
-        || jsonObject["@type"] != nil
-        || jsonObject["@graph"] != nil
-        || jsonObject["@reverse"] != nil
-        || jsonObject["@context"] != nil
+      } else if jsonObject[.id] != nil
+        || jsonObject[.type] != nil
+        || jsonObject[.graph] != nil
+        || jsonObject[.reverse] != nil
+        || jsonObject[.context] != nil
       {
         self = .node(try .init(from: jsonObject))
-      } else if jsonObject["@language"] != nil {
+      } else if jsonObject[.language] != nil {
         self = .invalid(.notJSONLDValue)
       } else if !jsonObject.keys.contains(where: { $0.hasPrefix("@") }) {
         if let languageMap = try? LanguageMap(from: jsonValue) {

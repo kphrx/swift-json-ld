@@ -18,7 +18,9 @@ struct ReversePropertyMap: JSONLDObjectProtocol, Equatable {
 
       switch value {
       case .object(let object):
-        if object.keys.contains("@value") || object.keys.contains("@list") {
+        if object.contains(.value)
+          || object.contains(.list)
+        {
           throw .code(.invalidReversePropertyValue)
         }
         map[key] = try .init(from: value)
@@ -27,7 +29,9 @@ struct ReversePropertyMap: JSONLDObjectProtocol, Equatable {
         nodes.reserveCapacity(array.count)
         for element in array {
           if case .object(let object) = element {
-            if object.keys.contains("@value") || object.keys.contains("@list") {
+            if object.contains(.value)
+              || object.contains(.list)
+            {
               throw .code(.invalidReversePropertyValue)
             }
             nodes.append(try .init(from: element))
