@@ -13,17 +13,17 @@ struct ExpansionTests {
     "[Expansion] Positive Evaluation Test with processingMode 1.0",
     arguments: TestCaseLoader.expansionTestsPositiveCases(version: .v1p0))
   func positiveEvaluationTestOneZero(testCase: ExpandTest.PositiveCase) throws {
-    let document = try TestCaseLoader.load(testCase.input, type: JSONLDDocument.self)
+    let document = try TestCaseLoader.load(testCase.input, type: JSONLDValues.self)
     let expandContext = try testCase.options.expandContextFilename.map { filename in
       try TestCaseLoader.load(filename, type: JSONLDDocument.self)
     }
-    let actual = try document.expand(
+    let actual = try input.expand(
       expandContext: expandContext,
       baseIRI: testCase.options.base,
       normative: testCase.options.normative
     )
-    let expect = try TestCaseLoader.load(testCase.expectFilename, type: JSONValue.self)
-    #expect(actual == expect)
+    let expect = try TestCaseLoader.load(testCase.expectFilename, type: JSONLDDocument.self)
+    #expect(actual.jsonValue == expect.jsonValue)
   }
 
   @Test(
@@ -43,11 +43,11 @@ struct ExpansionTests {
     }
 
     #expect(throws: JSONLDError.code(expectError)) {
-      let document = try TestCaseLoader.load(testCase.input, type: JSONLDDocument.self)
+      let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues.self)
       let expandContext = try testCase.options.expandContextFilename.map { filename in
         try TestCaseLoader.load(filename, type: JSONLDDocument.self)
       }
-      _ = try document.expand(
+      _ = try input.expand(
         expandContext: expandContext,
         baseIRI: testCase.options.base,
         normative: testCase.options.normative
