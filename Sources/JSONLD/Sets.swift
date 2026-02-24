@@ -73,7 +73,7 @@ struct ListObject: JSONLDObjectProtocol, Equatable {
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     guard let listValue = properties.removeValue(for: .list) else {
-      throw .code(.invalidSetOrListObject)
+      throw .internalError(.notSetOrListObject)
     }
 
     self.list = try .init(from: listValue)
@@ -110,7 +110,7 @@ struct SetObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     guard let setValue = properties.removeValue(for: .set) else {
-      throw .code(.invalidSetOrListObject)
+      throw .internalError(.notSetOrListObject)
     }
 
     self.set = try .init(from: setValue)

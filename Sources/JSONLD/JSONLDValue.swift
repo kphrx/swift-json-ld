@@ -77,14 +77,13 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
         || jsonObject[.graph] != nil
         || jsonObject[.reverse] != nil
         || jsonObject[.context] != nil
+        || jsonObject[.index] != nil
       {
         self = .node(try .init(from: jsonObject))
-      } else if jsonObject[.language] != nil {
-        self = .invalid(.notJSONLDValue)
       } else if !jsonObject.keys.contains(where: { $0.hasPrefix("@") }) {
         self = .node(try .init(from: jsonObject))
       } else {
-        self = .value(try .init(from: jsonObject))
+        self = .invalid(.notJSONLDValue)
       }
     default: self = .invalid(.notJSONLDValue)
     }

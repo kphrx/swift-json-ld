@@ -55,6 +55,8 @@ public enum JSONLDError: Error, Equatable {
   public enum Internal: Equatable, Sendable {
     case notObject
     case notNodeObject
+    case notValueObject
+    case notSetOrListObject
   }
 }
 
@@ -66,6 +68,8 @@ extension JSONLDError: CustomStringConvertible {
       switch internalError {
       case .notObject: "not an object"
       case .notNodeObject: "not a node object"
+      case .notValueObject: "not a value object"
+      case .notSetOrListObject: "not a set or list object"
       }
     }
   }

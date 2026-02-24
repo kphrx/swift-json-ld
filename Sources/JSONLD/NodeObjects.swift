@@ -45,6 +45,14 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
   }
 
   init(from jsonObject: JSONObject) throws(JSONLDError) {
+    guard !jsonObject.contains(.value),
+      !jsonObject.contains(.language),
+      !jsonObject.contains(.list),
+      !jsonObject.contains(.set)
+    else {
+      throw .internalError(.notNodeObject)
+    }
+
     var properties = jsonObject
 
     self.context = try properties.extractContext()
@@ -84,18 +92,6 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
     }
 
     self.index = try properties.extractIndex()
-
-    if properties.contains(.value)
-      || properties.contains(.language)
-    {
-      throw .internalError(.notNodeObject)
-    }
-
-    if properties.contains(.list)
-      || properties.contains(.set)
-    {
-      throw .internalError(.notNodeObject)
-    }
 
     self.properties = try properties.mapValuesWithTypedThrows(SingleOrMany<JSONLDValue>.init(from:))
   }
