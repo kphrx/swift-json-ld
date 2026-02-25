@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public enum Contexts: JSONLDValueProtocol, Equatable {
+public enum Contexts: JSONLDValueProtocol, Equatable, Sendable {
   case null
   case single(Context)
   case array([Context])
@@ -31,7 +31,7 @@ public enum Contexts: JSONLDValueProtocol, Equatable {
   }
 }
 
-public enum Context: JSONLDValueProtocol, Equatable {
+public enum Context: JSONLDValueProtocol, Equatable, Sendable {
   case absoluteIRI(String)
   case relativeIRI(String)
   case contextDefinition(ContextDefinition)
@@ -66,7 +66,7 @@ public enum Context: JSONLDValueProtocol, Equatable {
   }
 }
 
-public struct ContextDefinition: JSONLDObjectProtocol, Equatable {
+public struct ContextDefinition: JSONLDObjectProtocol, Equatable, Sendable {
   let baseIRI: BaseIRI?
   let vocabMapping: VocabMapping?
   let defaultLanguage: DefaultLanguage?
@@ -121,7 +121,7 @@ public struct ContextDefinition: JSONLDObjectProtocol, Equatable {
 }
 
 extension ContextDefinition {
-  enum BaseIRI: JSONLDValueProtocol, Equatable {
+  enum BaseIRI: JSONLDValueProtocol, Equatable, Sendable {
     case string(String)
     case null
 
@@ -147,7 +147,7 @@ extension ContextDefinition {
     }
   }
 
-  enum VocabMapping: JSONLDValueProtocol, Equatable {
+  enum VocabMapping: JSONLDValueProtocol, Equatable, Sendable {
     case string(String)
     case null
 
@@ -173,7 +173,7 @@ extension ContextDefinition {
     }
   }
 
-  enum DefaultLanguage: JSONLDValueProtocol, Equatable {
+  enum DefaultLanguage: JSONLDValueProtocol, Equatable, Sendable {
     case string(String)
     case null
 
@@ -200,7 +200,7 @@ extension ContextDefinition {
   }
 }
 
-public enum TermDefinitionValue: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionValue: JSONLDValueProtocol, Equatable, Sendable {
   case null
   case keyword(JSONLDKeyword)
   case iriOrTerm(String)
@@ -233,7 +233,7 @@ public enum TermDefinitionValue: JSONLDValueProtocol, Equatable {
   }
 }
 
-public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable {
+public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
   case standard(Standard)
   case reverse(Reverse)
 
@@ -292,7 +292,7 @@ public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable {
 }
 
 extension ExpandedTermDefinition {
-  public struct Standard: Equatable {
+  public struct Standard: Equatable, Sendable {
     let id: TermDefinitionId?
     let type: TermDefinitionType?
     let language: TermDefinitionLanguage?
@@ -331,7 +331,7 @@ extension ExpandedTermDefinition {
     }
   }
 
-  public struct Reverse: Equatable {
+  public struct Reverse: Equatable, Sendable {
     let reverse: TermDefinitionReverse
     let type: TermDefinitionType?
     let language: TermDefinitionLanguage?
@@ -368,7 +368,7 @@ extension ExpandedTermDefinition {
     }
   }
 
-  public enum Container: JSONLDValueProtocol, Equatable {
+  public enum Container: JSONLDValueProtocol, Equatable, Sendable {
     case set
     case list
     case index
@@ -421,7 +421,7 @@ extension ExpandedTermDefinition {
   }
 }
 
-public enum TermDefinitionId: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionId: JSONLDValueProtocol, Equatable, Sendable {
   case null
   case keyword(JSONLDKeyword)
   case iriOrTerm(String)
@@ -451,7 +451,7 @@ public enum TermDefinitionId: JSONLDValueProtocol, Equatable {
 }
 
 extension ExpandedTermDefinition.Reverse {
-  public enum Container: Equatable {
+  public enum Container: Equatable, Sendable {
     case set
     case index
     case null
@@ -484,7 +484,7 @@ extension ExpandedTermDefinition.Reverse {
   }
 }
 
-public enum TermDefinitionType: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionType: JSONLDValueProtocol, Equatable, Sendable {
   case null
   case keyword(JSONLDKeyword)
   case iriOrTerm(String)
@@ -516,7 +516,7 @@ public enum TermDefinitionType: JSONLDValueProtocol, Equatable {
   }
 }
 
-public enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable, Sendable {
   case string(String)
   case null
 
@@ -539,7 +539,7 @@ public enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable {
   }
 }
 
-public enum TermDefinitionReverse: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionReverse: JSONLDValueProtocol, Equatable, Sendable {
   case string(String)
   case null
 

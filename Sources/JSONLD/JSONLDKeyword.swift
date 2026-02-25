@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public enum JSONLDKeyword: String, CaseIterable, JSONLDValueProtocol {
+public enum JSONLDKeyword: String, CaseIterable, JSONLDValueProtocol, Sendable {
   case base = "@base"
   case container = "@container"
   case context = "@context"

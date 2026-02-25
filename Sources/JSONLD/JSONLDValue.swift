@@ -11,7 +11,7 @@ public indirect enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable
   case unknown(P.UnknownContent)
   case invalid(InvalidValue)
 
-  public enum InvalidValue: Equatable {
+  public enum InvalidValue: Equatable, Sendable {
     case notJSONLDValue
     case listOfLists
 
