@@ -55,9 +55,9 @@ public struct JSONLDValues<P: JSONLDPhase>: JSONLDValueProtocol, Equatable, Deco
     context: JSONLDDocument<Unresolved>? = nil,
     baseIRI: String? = nil,
     compactArrays: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument<Unresolved> {
+  ) throws(JSONLDError) -> JSONLDValues<P> {
     _ = (context, baseIRI, compactArrays)
-    return try .init(from: self.jsonValue)
+    return self
   }
 
   public func compact(
@@ -65,13 +65,8 @@ public struct JSONLDValues<P: JSONLDPhase>: JSONLDValueProtocol, Equatable, Deco
     baseIRI: String? = nil,
     compactArrays: Bool = true,
     compactToRelative: Bool = true
-  ) throws(JSONLDError) -> JSONLDValues<Unresolved> {
+  ) throws(JSONLDError) -> JSONLDValues<P> {
     _ = (context, baseIRI, compactArrays, compactToRelative)
-    // Stub implementation returning self (cast needed if P != Unresolved)
-    // For now assume P == Unresolved for stub
-    if let selfUnresolved = self as? JSONLDValues<Unresolved> {
-      return selfUnresolved
-    }
-    return try .init(from: self.jsonValue)
+    return self
   }
 }

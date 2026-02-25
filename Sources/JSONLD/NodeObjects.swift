@@ -13,6 +13,10 @@ public struct NodeObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
   public var jsonObject: JSONObject {
     var jsonObject: JSONObject = self.properties.mapValues { $0.jsonValue }
 
+    if let context = self.context {
+      jsonObject[.context] = context.jsonValue
+    }
+
     if let id = self.id {
       jsonObject[.id] = .string(id)
     }

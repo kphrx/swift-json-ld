@@ -65,14 +65,8 @@ public indirect enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable
         self = .node(try .init(from: jsonObject))
       } else if !jsonObject.keys.contains(where: { $0.hasPrefix("@") }) {
         self = .node(try .init(from: jsonObject))
-      } else if P.self == Unresolved.self {
-        let content = try jsonObject.mapValuesWithTypedThrows(
-          SingleOrMany<JSONLDValue<Unresolved>>.init(from:))
-        if let content = content as? P.UnknownContent {
-          self = .unknown(content)
-        } else {
-          self = .invalid(.notJSONLDValue)
-        }
+      } else if let content = try P.makeUnknown(from: jsonObject) {
+        self = .unknown(content)
       } else {
         self = .invalid(.notJSONLDValue)
       }
