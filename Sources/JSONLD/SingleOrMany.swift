@@ -49,3 +49,12 @@ where T: JSONLDValueProtocol {
     try self.init(from: jsonValue, mapper: T.init(from:))
   }
 }
+
+extension SingleOrMany: Sequence {
+  public func makeIterator() -> AnyIterator<T> {
+    switch self {
+    case .single(let value): .init([value].makeIterator())
+    case .many(let values): .init(values.makeIterator())
+    }
+  }
+}
