@@ -13,16 +13,17 @@ struct CompactionTests {
     "[Compaction] Positive Evaluation Test with processingMode 1.0",
     arguments: TestCaseLoader.compactionTestsPositiveCases(version: .v1p0))
   func positiveEvaluationTestOneZero(testCase: CompactTest.PositiveCase) throws {
-    let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues.self)
+    let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
     let context = try TestCaseLoader.load(
-      testCase.options.contextFilename, type: JSONLDDocument.self)
+      testCase.options.contextFilename, type: JSONLDDocument<Unresolved>.self)
     let actual = try input.compact(
       context: context,
       baseIRI: testCase.options.base,
       compactArrays: testCase.options.compactArrays,
       compactToRelative: testCase.options.compactToRelative
     )
-    let expect = try TestCaseLoader.load(testCase.expectFilename, type: JSONLDDocument.self)
+    let expect = try TestCaseLoader.load(
+      testCase.expectFilename, type: JSONLDDocument<Unresolved>.self)
     #expect(actual.jsonValue == expect.jsonValue)
   }
 
@@ -43,9 +44,9 @@ struct CompactionTests {
     }
 
     #expect(throws: JSONLDError.code(expectError)) {
-      let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues.self)
+      let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
       let context = try TestCaseLoader.load(
-        testCase.options.contextFilename, type: JSONLDDocument.self)
+        testCase.options.contextFilename, type: JSONLDDocument<Unresolved>.self)
       _ = try input.compact(
         context: context,
         baseIRI: testCase.options.base,

@@ -3,10 +3,10 @@
 
 @_exported import JSONCodable
 
-public struct JSONLDDocument: JSONLDValueProtocol, Equatable, Decodable {
-  public let value: SingleOrMany<NodeObject>
+public struct JSONLDDocument<P: JSONLDPhase>: JSONLDValueProtocol, Equatable, Decodable {
+  let value: SingleOrMany<NodeObject<P>>
 
-  public init(_ value: SingleOrMany<NodeObject>) {
+  public init(_ value: SingleOrMany<NodeObject<P>>) {
     self.value = value
   }
 
@@ -20,41 +20,13 @@ public struct JSONLDDocument: JSONLDValueProtocol, Equatable, Decodable {
 
   public init(from decoder: Decoder) throws {
     try self.init(from: JSONValue(from: decoder))
-  }
-
-  public func expand(
-    expandContext: JSONLDDocument? = nil,
-    baseIRI: String? = nil,
-    normative: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument {
-    _ = (expandContext, baseIRI, normative)
-    return self
-  }
-
-  public func compact(
-    context: JSONLDDocument,
-    baseIRI: String? = nil,
-    compactArrays: Bool = true,
-    compactToRelative: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument {
-    _ = (context, baseIRI, compactArrays, compactToRelative)
-    return self
-  }
-
-  public func flatten(
-    context: JSONLDDocument? = nil,
-    baseIRI: String? = nil,
-    compactArrays: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument {
-    _ = (context, baseIRI, compactArrays)
-    return self
   }
 }
 
-public struct JSONLDValues: JSONLDValueProtocol, Equatable, Decodable {
-  let value: SingleOrMany<JSONLDValue>
+public struct JSONLDValues<P: JSONLDPhase>: JSONLDValueProtocol, Equatable, Decodable {
+  let value: SingleOrMany<JSONLDValue<P>>
 
-  init(_ value: SingleOrMany<JSONLDValue>) {
+  init(_ value: SingleOrMany<JSONLDValue<P>>) {
     self.value = value
   }
 
@@ -71,30 +43,35 @@ public struct JSONLDValues: JSONLDValueProtocol, Equatable, Decodable {
   }
 
   public func expand(
-    expandContext: JSONLDDocument? = nil,
+    expandContext: JSONLDDocument<Unresolved>? = nil,
     baseIRI: String? = nil,
     normative: Bool = true
-  ) throws(JSONLDError) -> JSONLDValues {
+  ) throws(JSONLDError) -> JSONLDDocument<Expanded> {
     _ = (expandContext, baseIRI, normative)
-    return self
-  }
-
-  public func compact(
-    context: JSONLDDocument,
-    baseIRI: String? = nil,
-    compactArrays: Bool = true,
-    compactToRelative: Bool = true
-  ) throws(JSONLDError) -> JSONLDValues {
-    _ = (context, baseIRI, compactArrays, compactToRelative)
-    return self
+    return try .init(from: self.jsonValue)
   }
 
   public func flatten(
-    context: JSONLDDocument? = nil,
+    context: JSONLDDocument<Unresolved>? = nil,
     baseIRI: String? = nil,
     compactArrays: Bool = true
-  ) throws(JSONLDError) -> JSONLDValues {
+  ) throws(JSONLDError) -> JSONLDDocument<Unresolved> {
     _ = (context, baseIRI, compactArrays)
-    return self
+    return try .init(from: self.jsonValue)
+  }
+
+  public func compact(
+    context: JSONLDDocument<Unresolved>,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true,
+    compactToRelative: Bool = true
+  ) throws(JSONLDError) -> JSONLDValues<Unresolved> {
+    _ = (context, baseIRI, compactArrays, compactToRelative)
+    // Stub implementation returning self (cast needed if P != Unresolved)
+    // For now assume P == Unresolved for stub
+    if let selfUnresolved = self as? JSONLDValues<Unresolved> {
+      return selfUnresolved
+    }
+    return try .init(from: self.jsonValue)
   }
 }

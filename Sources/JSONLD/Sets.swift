@@ -1,20 +1,20 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-enum SetValue: JSONLDValueProtocol, Equatable {
+public enum SetValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
   case string(String)
   case integer(Int)
   case float(Double)
   case boolean(Bool)
   case null
-  case nodeObject(NodeObject)
-  case valueObject(ValueObject)
+  case nodeObject(NodeObject<P>)
+  case valueObject(ValueObject<P>)
 
-  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [SetValue] {
+  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [SetValue<P>] {
     try jsonArray.map(SetValue.init(from:))
   }
 
-  var jsonValue: JSONValue {
+  public var jsonValue: JSONValue {
     switch self {
     case .string(let value): .string(value)
     case .integer(let value): .integer(value)
@@ -26,7 +26,7 @@ enum SetValue: JSONLDValueProtocol, Equatable {
     }
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
       case .string(let value): .string(value)
@@ -50,11 +50,11 @@ enum SetValue: JSONLDValueProtocol, Equatable {
   }
 }
 
-enum SetOrListObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
-  case set(SingleOrMany<SetValue>, context: Contexts?, index: String?)
-  case list(SingleOrMany<SetValue>, context: Contexts?, index: String?)
+public enum SetOrListObject<P: JSONLDPhase>: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
+  case set(SingleOrMany<SetValue<P>>, context: Contexts?, index: String?)
+  case list(SingleOrMany<SetValue<P>>, context: Contexts?, index: String?)
 
-  private var values: SingleOrMany<SetValue> {
+  private var values: SingleOrMany<SetValue<P>> {
     switch self {
     case .set(let values, _, _), .list(let values, _, _):
       values
@@ -84,7 +84,7 @@ enum SetOrListObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
     }
   }
 
-  var jsonObject: JSONObject {
+  public var jsonObject: JSONObject {
     var jsonObject: JSONObject = [:]
     jsonObject[self.keyword] = self.values.jsonValue
 
@@ -99,7 +99,7 @@ enum SetOrListObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
     return jsonObject
   }
 
-  init(from jsonObject: JSONObject) throws(JSONLDError) {
+  public init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     let context = try properties.extractContext()
     let index = try properties.extractIndex()

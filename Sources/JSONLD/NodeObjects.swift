@@ -1,14 +1,14 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public struct NodeObject: JSONLDObjectProtocol, Equatable {
+public struct NodeObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
   let context: Contexts?
   let id: String?
-  let graph: SingleOrMany<NodeObject>?
+  let graph: SingleOrMany<NodeObject<P>>?
   let type: SingleOrMany<String>?
-  let reverse: ReversePropertyMap?
+  let reverse: ReversePropertyMap<P>?
   let index: String?
-  let properties: [String: SingleOrMany<JSONLDValue>]
+  let properties: [String: SingleOrMany<JSONLDValue<P>>]
 
   public var jsonObject: JSONObject {
     var jsonObject: JSONObject = self.properties.mapValues { $0.jsonValue }
@@ -44,7 +44,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
     return jsonObject
   }
 
-  init(from jsonObject: JSONObject) throws(JSONLDError) {
+  public init(from jsonObject: JSONObject) throws(JSONLDError) {
     guard !jsonObject.contains(.value),
       !jsonObject.contains(.language),
       !jsonObject.contains(.list),
@@ -65,10 +65,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
       }
     }
 
-    self.graph = try properties.removeValue(for: .graph).map {
-      graphValue throws(JSONLDError) in
-      try .init(from: graphValue)
-    }
+    self.graph = try properties.removeValue(for: .graph).map(SingleOrMany.init(from:))
 
     self.type = try properties.removeValue(for: .type).map { typeValue throws(JSONLDError) in
       try .init(
@@ -93,7 +90,7 @@ public struct NodeObject: JSONLDObjectProtocol, Equatable {
 
     self.index = try properties.extractIndex()
 
-    self.properties = try properties.mapValuesWithTypedThrows(SingleOrMany<JSONLDValue>.init(from:))
+    self.properties = try properties.mapValuesWithTypedThrows(SingleOrMany.init(from:))
   }
 
   public init(from jsonValue: JSONValue) throws(JSONLDError) {

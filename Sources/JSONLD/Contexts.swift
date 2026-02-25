@@ -1,12 +1,12 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-enum Contexts: JSONLDValueProtocol, Equatable {
+public enum Contexts: JSONLDValueProtocol, Equatable {
   case null
   case single(Context)
   case array([Context])
 
-  var jsonValue: JSONValue {
+  public var jsonValue: JSONValue {
     switch self {
     case .null: .null
     case .single(let context): context.jsonValue
@@ -18,7 +18,7 @@ enum Contexts: JSONLDValueProtocol, Equatable {
     self = .array(try jsonArray.map(Context.init(from:)))
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       if case .null = jsonValue {
         .null
@@ -31,12 +31,12 @@ enum Contexts: JSONLDValueProtocol, Equatable {
   }
 }
 
-enum Context: JSONLDValueProtocol, Equatable {
+public enum Context: JSONLDValueProtocol, Equatable {
   case absoluteIRI(String)
   case relativeIRI(String)
   case contextDefinition(ContextDefinition)
 
-  var jsonValue: JSONValue {
+  public var jsonValue: JSONValue {
     switch self {
     case .absoluteIRI(let value), .relativeIRI(let value): .string(value)
     case .contextDefinition(let contextDefinition): contextDefinition.jsonValue
@@ -52,11 +52,11 @@ enum Context: JSONLDValueProtocol, Equatable {
       }
   }
 
-  init(from jsonObject: JSONObject) throws(JSONLDError) {
+  public init(from jsonObject: JSONObject) throws(JSONLDError) {
     self = .contextDefinition(try .init(from: jsonObject))
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
       case .object(let jsonObject): try .init(from: jsonObject)
@@ -66,13 +66,13 @@ enum Context: JSONLDValueProtocol, Equatable {
   }
 }
 
-struct ContextDefinition: JSONLDObjectProtocol, Equatable {
+public struct ContextDefinition: JSONLDObjectProtocol, Equatable {
   let baseIRI: BaseIRI?
   let vocabMapping: VocabMapping?
   let defaultLanguage: DefaultLanguage?
   let terms: [String: TermDefinitionValue]
 
-  var jsonObject: JSONObject {
+  public var jsonObject: JSONObject {
     var jsonObject = self.terms.jsonObject
 
     if let baseIRI = self.baseIRI {
@@ -90,7 +90,7 @@ struct ContextDefinition: JSONLDObjectProtocol, Equatable {
     return jsonObject
   }
 
-  init(from jsonObject: JSONObject) throws(JSONLDError) {
+  public init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     if properties.removeValue(for: .version) != nil {
       // NOTE: JSON-LD 1.1 uses @version, but json-ld-1.0 processing mode conflicts.
@@ -200,13 +200,13 @@ extension ContextDefinition {
   }
 }
 
-enum TermDefinitionValue: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionValue: JSONLDValueProtocol, Equatable {
   case null
   case keyword(JSONLDKeyword)
   case iriOrTerm(String)
   case expanded(ExpandedTermDefinition)
 
-  var jsonValue: JSONValue {
+  public var jsonValue: JSONValue {
     switch self {
     case .null: .null
     case .keyword(let keyword): keyword.jsonValue
@@ -215,7 +215,7 @@ enum TermDefinitionValue: JSONLDValueProtocol, Equatable {
     }
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
     case .null:
       self = .null
@@ -233,11 +233,11 @@ enum TermDefinitionValue: JSONLDValueProtocol, Equatable {
   }
 }
 
-enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable {
+public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable {
   case standard(Standard)
   case reverse(Reverse)
 
-  var jsonObject: JSONObject {
+  public var jsonObject: JSONObject {
     switch self {
     case .standard(let standard):
       standard.jsonObject
@@ -246,7 +246,7 @@ enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable {
     }
   }
 
-  init(from jsonObject: JSONObject) throws(JSONLDError) {
+  public init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
 
     let id = try properties.removeValue(for: .id).map(TermDefinitionId.init)
@@ -292,7 +292,7 @@ enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable {
 }
 
 extension ExpandedTermDefinition {
-  struct Standard: Equatable {
+  public struct Standard: Equatable {
     let id: TermDefinitionId?
     let type: TermDefinitionType?
     let language: TermDefinitionLanguage?
@@ -331,7 +331,7 @@ extension ExpandedTermDefinition {
     }
   }
 
-  struct Reverse: Equatable {
+  public struct Reverse: Equatable {
     let reverse: TermDefinitionReverse
     let type: TermDefinitionType?
     let language: TermDefinitionLanguage?
@@ -368,7 +368,7 @@ extension ExpandedTermDefinition {
     }
   }
 
-  enum Container: JSONLDValueProtocol, Equatable {
+  public enum Container: JSONLDValueProtocol, Equatable {
     case set
     case list
     case index
@@ -390,11 +390,11 @@ extension ExpandedTermDefinition {
       }
     }
 
-    var jsonValue: JSONValue {
+    public var jsonValue: JSONValue {
       self.keyword?.jsonValue ?? .null
     }
 
-    init(from jsonValue: JSONValue) throws(JSONLDError) {
+    public init(from jsonValue: JSONValue) throws(JSONLDError) {
       switch jsonValue {
       case .string(let value):
         guard let keyword = JSONLDKeyword(rawValue: value) else {
@@ -421,12 +421,12 @@ extension ExpandedTermDefinition {
   }
 }
 
-enum TermDefinitionId: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionId: JSONLDValueProtocol, Equatable {
   case null
   case keyword(JSONLDKeyword)
   case iriOrTerm(String)
 
-  var jsonValue: JSONValue {
+  public var jsonValue: JSONValue {
     switch self {
     case .null: .null
     case .keyword(let keyword): keyword.jsonValue
@@ -434,7 +434,7 @@ enum TermDefinitionId: JSONLDValueProtocol, Equatable {
     }
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
     case .string(let value):
       if let keyword = JSONLDKeyword(rawValue: value) {
@@ -451,7 +451,7 @@ enum TermDefinitionId: JSONLDValueProtocol, Equatable {
 }
 
 extension ExpandedTermDefinition.Reverse {
-  enum Container: Equatable {
+  public enum Container: Equatable {
     case set
     case index
     case null
@@ -484,12 +484,12 @@ extension ExpandedTermDefinition.Reverse {
   }
 }
 
-enum TermDefinitionType: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionType: JSONLDValueProtocol, Equatable {
   case null
   case keyword(JSONLDKeyword)
   case iriOrTerm(String)
 
-  var jsonValue: JSONValue {
+  public var jsonValue: JSONValue {
     switch self {
     case .null: .null
     case .keyword(let keyword): keyword.jsonValue
@@ -497,7 +497,7 @@ enum TermDefinitionType: JSONLDValueProtocol, Equatable {
     }
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
     case .string(let value):
       if let keyword = JSONLDKeyword(rawValue: value) {
@@ -516,18 +516,18 @@ enum TermDefinitionType: JSONLDValueProtocol, Equatable {
   }
 }
 
-enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable {
   case string(String)
   case null
 
-  var jsonValue: JSONValue {
+  public var jsonValue: JSONValue {
     switch self {
     case .string(let value): .string(value)
     case .null: .null
     }
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
     case .string(let value):
       self = .string(value)
@@ -539,18 +539,18 @@ enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable {
   }
 }
 
-enum TermDefinitionReverse: JSONLDValueProtocol, Equatable {
+public enum TermDefinitionReverse: JSONLDValueProtocol, Equatable {
   case string(String)
   case null
 
-  var jsonValue: JSONValue {
+  public var jsonValue: JSONValue {
     switch self {
     case .string(let value): .string(value)
     case .null: .null
     }
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
     case .string(let value):
       self = .string(value)

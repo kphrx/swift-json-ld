@@ -9,12 +9,12 @@ protocol JSONLDArrayProtocol: JSONLDValueProtocol, CustomJSONArrayConvertible {
   init(from jsonArray: JSONArray) throws(JSONLDError)
 }
 
-protocol JSONLDObjectProtocol: JSONLDValueProtocol, CustomJSONObjectConvertible {
+public protocol JSONLDObjectProtocol: JSONLDValueProtocol, CustomJSONObjectConvertible {
   init(from jsonObject: JSONObject) throws(JSONLDError)
 }
 
 extension JSONLDValueProtocol where Self: JSONLDObjectProtocol {
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     if case .object(let jsonObject) = jsonValue {
       try self.init(from: jsonObject)
     } else {

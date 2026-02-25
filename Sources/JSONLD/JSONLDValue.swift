@@ -1,25 +1,26 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
+public indirect enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
   case iriOrTerm(String)
-  case node(NodeObject)
-  case value(ValueObject)
-  case setOrList(SetOrListObject)
-  case languageMap(LanguageMap)
-  case indexMap(IndexMap)
+  case node(NodeObject<P>)
+  case value(ValueObject<P>)
+  case setOrList(SetOrListObject<P>)
+  case languageMap(LanguageMap<P>)
+  case indexMap(IndexMap<P>)
+  case unknown(P.UnknownContent)
   case invalid(InvalidValue)
 
-  enum InvalidValue: Equatable {
+  public enum InvalidValue: Equatable {
     case notJSONLDValue
     case listOfLists
 
-    var jsonValue: JSONValue {
+    public var jsonValue: JSONValue {
       .null
     }
   }
 
-  var jsonValue: JSONValue {
+  public var jsonValue: JSONValue {
     switch self {
     case .iriOrTerm(let value): .string(value)
     case .node(let node): node.jsonValue
@@ -27,11 +28,17 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
     case .setOrList(let object): object.jsonValue
     case .languageMap(let languageMap): languageMap.jsonValue
     case .indexMap(let indexMap): indexMap.jsonValue
+    case .unknown(let content):
+      if let jsonObject = content as? [String: SingleOrMany<JSONLDValue<Unresolved>>] {
+        .object(jsonObject.mapValues(\.jsonValue))
+      } else {
+        .null
+      }
     case .invalid(let invalid): invalid.jsonValue
     }
   }
 
-  init(from jsonValue: JSONValue) throws(JSONLDError) {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
     case .string(let string):
       self = .iriOrTerm(string)
@@ -58,6 +65,14 @@ indirect enum JSONLDValue: JSONLDValueProtocol, Equatable {
         self = .node(try .init(from: jsonObject))
       } else if !jsonObject.keys.contains(where: { $0.hasPrefix("@") }) {
         self = .node(try .init(from: jsonObject))
+      } else if P.self == Unresolved.self {
+        let content = try jsonObject.mapValuesWithTypedThrows(
+          SingleOrMany<JSONLDValue<Unresolved>>.init(from:))
+        if let content = content as? P.UnknownContent {
+          self = .unknown(content)
+        } else {
+          self = .invalid(.notJSONLDValue)
+        }
       } else {
         self = .invalid(.notJSONLDValue)
       }

@@ -25,7 +25,7 @@ enum ValueType: JSONLDValueProtocol, Equatable {
   }
 }
 
-struct ValueObject: JSONLDObjectProtocol, Equatable {
+public struct ValueObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
   enum Value: JSONLDValueProtocol, Equatable {
     case string(String)
     case integer(Int)
@@ -61,7 +61,7 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
   let language: String?
   let index: String?
 
-  var jsonObject: JSONObject {
+  public var jsonObject: JSONObject {
     var jsonObject: JSONObject = [:]
 
     jsonObject[.value] = self.value.jsonValue
@@ -81,7 +81,7 @@ struct ValueObject: JSONLDObjectProtocol, Equatable {
     return jsonObject
   }
 
-  init(from jsonObject: JSONObject) throws(JSONLDError) {
+  public init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     guard let value = properties.removeValue(for: .value) else {
       throw .internalError(.notValueObject)
