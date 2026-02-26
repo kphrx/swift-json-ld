@@ -88,8 +88,9 @@ public struct JSONLDValues<P: JSONLDPhase>: JSONLDValueProtocol, Equatable, Deco
     }
 
     if let expandContext {
-      activeContext = try activeContext.process(
-        localContext: try .init(from: expandContext.jsonValue))
+      for contexts in expandContext.value.compactMap(\.context) {
+        activeContext = try activeContext.process(localContext: contexts)
+      }
     }
 
     let unresolvedValues = try self.value.map { val throws(JSONLDError) in
