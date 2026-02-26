@@ -14,10 +14,6 @@ public enum Contexts: JSONLDValueProtocol, Equatable, Sendable {
     }
   }
 
-  init(from jsonArray: JSONArray) throws(JSONLDError) {
-    self = .array(try jsonArray.map(Context.init(from:)))
-  }
-
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       if case .null = jsonValue {
@@ -122,80 +118,74 @@ public struct ContextDefinition: JSONLDObjectProtocol, Equatable, Sendable {
 
 extension ContextDefinition {
   enum BaseIRI: JSONLDValueProtocol, Equatable, Sendable {
-    case string(String)
     case null
+    case string(String)
 
     var jsonValue: JSONValue {
       switch self {
-      case .string(let value): .string(value)
       case .null: .null
+      case .string(let value): .string(value)
       }
     }
 
     init(from jsonValue: JSONValue) throws(JSONLDError) {
-      switch jsonValue {
-      case .string(let value):
-        if JSONLDKeyword(rawValue: value) != nil {
+      self =
+        switch jsonValue {
+        case .null:
+          .null
+        case .string(let value) where JSONLDKeyword(rawValue: value) == nil:
+          .string(value)
+        default:
           throw .code(.invalidBaseIRI)
         }
-        self = .string(value)
-      case .null:
-        self = .null
-      default:
-        throw .code(.invalidBaseIRI)
-      }
     }
   }
 
   enum VocabMapping: JSONLDValueProtocol, Equatable, Sendable {
-    case string(String)
     case null
+    case string(String)
 
     var jsonValue: JSONValue {
       switch self {
-      case .string(let value): .string(value)
       case .null: .null
+      case .string(let value): .string(value)
       }
     }
 
     init(from jsonValue: JSONValue) throws(JSONLDError) {
-      switch jsonValue {
-      case .string(let value):
-        if JSONLDKeyword(rawValue: value) != nil {
+      self =
+        switch jsonValue {
+        case .null:
+          .null
+        case .string(let value) where JSONLDKeyword(rawValue: value) == nil:
+          .string(value)
+        default:
           throw .code(.invalidVocabMapping)
         }
-        self = .string(value)
-      case .null:
-        self = .null
-      default:
-        throw .code(.invalidVocabMapping)
-      }
     }
   }
 
   enum DefaultLanguage: JSONLDValueProtocol, Equatable, Sendable {
-    case string(String)
     case null
+    case string(String)
 
     var jsonValue: JSONValue {
       switch self {
-      case .string(let value): .string(value)
       case .null: .null
+      case .string(let value): .string(value)
       }
     }
 
     init(from jsonValue: JSONValue) throws(JSONLDError) {
-      switch jsonValue {
-      case .string(let value):
-        if JSONLDKeyword(rawValue: value) != nil {
+      self =
+        switch jsonValue {
+        case .null:
+          .null
+        case .string(let value) where JSONLDKeyword(rawValue: value) == nil:
+          .string(value)
+        default:
           throw .code(.invalidDefaultLanguage)
         }
-        self = .string(value)
-      case .null:
-        self = .null
-      default:
-        throw .code(.invalidDefaultLanguage)
-      }
     }
   }
 }
@@ -216,20 +206,21 @@ public enum TermDefinitionValue: JSONLDValueProtocol, Equatable, Sendable {
   }
 
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
-    switch jsonValue {
-    case .null:
-      self = .null
-    case .string(let value):
-      if let keyword = JSONLDKeyword(rawValue: value) {
-        self = .keyword(keyword)
-      } else {
-        self = .iriOrTerm(value)
+    self =
+      switch jsonValue {
+      case .null:
+        .null
+      case .string(let value):
+        if let keyword = JSONLDKeyword(rawValue: value) {
+          .keyword(keyword)
+        } else {
+          .iriOrTerm(value)
+        }
+      case .object(let jsonObject):
+        .expanded(try .init(from: jsonObject))
+      default:
+        throw .code(.invalidTermDefinition)
       }
-    case .object(let jsonObject):
-      self = .expanded(try .init(from: jsonObject))
-    default:
-      throw .code(.invalidTermDefinition)
-    }
   }
 }
 
@@ -239,10 +230,8 @@ public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
 
   public var jsonObject: JSONObject {
     switch self {
-    case .standard(let standard):
-      standard.jsonObject
-    case .reverse(let reverse):
-      reverse.jsonObject
+    case .standard(let standard): standard.jsonObject
+    case .reverse(let reverse): reverse.jsonObject
     }
   }
 
@@ -335,7 +324,7 @@ extension ExpandedTermDefinition {
     let reverse: TermDefinitionReverse
     let type: TermDefinitionType?
     let language: TermDefinitionLanguage?
-    let container: Reverse.Container?
+    let container: Container?
     let context: Contexts?
     let index: JSONValue?
 
@@ -369,14 +358,16 @@ extension ExpandedTermDefinition {
   }
 
   public enum Container: JSONLDValueProtocol, Equatable, Sendable {
+    case null
     case set
     case list
     case index
     case language
-    case null
 
     var keyword: JSONLDKeyword? {
       switch self {
+      case .null:
+        nil
       case .set:
         .set
       case .list:
@@ -385,8 +376,6 @@ extension ExpandedTermDefinition {
         .index
       case .language:
         .language
-      case .null:
-        nil
       }
     }
 
@@ -396,6 +385,8 @@ extension ExpandedTermDefinition {
 
     public init(from jsonValue: JSONValue) throws(JSONLDError) {
       switch jsonValue {
+      case .null:
+        self = .null
       case .string(let value):
         guard let keyword = JSONLDKeyword(rawValue: value) else {
           throw .code(.invalidContainerMapping)
@@ -408,8 +399,6 @@ extension ExpandedTermDefinition {
           case .language: .language
           default: throw .code(.invalidContainerMapping)
           }
-      case .null:
-        self = .null
       case .array:
         // NOTE: JSON-LD 1.1 allows container arrays; json-ld-1.0 does not.
         throw .code(.invalidContainerMapping)
@@ -435,35 +424,36 @@ public enum TermDefinitionId: JSONLDValueProtocol, Equatable, Sendable {
   }
 
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
-    switch jsonValue {
-    case .string(let value):
-      if let keyword = JSONLDKeyword(rawValue: value) {
-        self = .keyword(keyword)
-      } else {
-        self = .iriOrTerm(value)
+    self =
+      switch jsonValue {
+      case .null:
+        .null
+      case .string(let value):
+        if let keyword = JSONLDKeyword(rawValue: value) {
+          .keyword(keyword)
+        } else {
+          .iriOrTerm(value)
+        }
+      default:
+        throw .code(.invalidIRIMapping)
       }
-    case .null:
-      self = .null
-    default:
-      throw .code(.invalidIRIMapping)
-    }
   }
 }
 
 extension ExpandedTermDefinition.Reverse {
   public enum Container: Equatable, Sendable {
+    case null
     case set
     case index
-    case null
 
     var keyword: JSONLDKeyword? {
       switch self {
+      case .null:
+        nil
       case .set:
         .set
       case .index:
         .index
-      case .null:
-        nil
       }
     }
 
@@ -473,12 +463,12 @@ extension ExpandedTermDefinition.Reverse {
 
     init(from container: ExpandedTermDefinition.Container) throws(JSONLDError) {
       switch container {
+      case .null:
+        self = .null
       case .set: self = .set
       case .index: self = .index
       case .list, .language:
         throw .code(.invalidReverseProperty)
-      case .null:
-        self = .null
       }
     }
   }
@@ -498,66 +488,70 @@ public enum TermDefinitionType: JSONLDValueProtocol, Equatable, Sendable {
   }
 
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
-    switch jsonValue {
-    case .string(let value):
-      if let keyword = JSONLDKeyword(rawValue: value) {
-        if keyword == .none {
-          throw .code(.invalidTypeMapping)
+    self =
+      switch jsonValue {
+      case .null:
+        .null
+      case .string(let value):
+        if let keyword = JSONLDKeyword(rawValue: value) {
+          if keyword == .none {
+            throw .code(.invalidTypeMapping)
+          } else {
+            .keyword(keyword)
+          }
+        } else {
+          .iriOrTerm(value)
         }
-        self = .keyword(keyword)
-      } else {
-        self = .iriOrTerm(value)
+      default:
+        throw .code(.invalidTypeMapping)
       }
-    case .null:
-      self = .null
-    default:
-      throw .code(.invalidTypeMapping)
-    }
   }
 }
 
 public enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable, Sendable {
-  case string(String)
   case null
+  case string(String)
 
   public var jsonValue: JSONValue {
     switch self {
-    case .string(let value): .string(value)
     case .null: .null
+    case .string(let value): .string(value)
     }
   }
 
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
-    switch jsonValue {
-    case .string(let value):
-      self = .string(value)
-    case .null:
-      self = .null
-    default:
-      throw .code(.invalidLanguageMapping)
-    }
+    self =
+      switch jsonValue {
+      case .null:
+        .null
+      case .string(let value):
+        .string(value)
+      default:
+        throw .code(.invalidLanguageMapping)
+      }
   }
 }
 
 public enum TermDefinitionReverse: JSONLDValueProtocol, Equatable, Sendable {
-  case string(String)
   case null
+  case string(String)
 
   public var jsonValue: JSONValue {
     switch self {
-    case .string(let value): .string(value)
     case .null: .null
+    case .string(let value): .string(value)
     }
   }
 
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
-    switch jsonValue {
-    case .string(let value):
-      self = .string(value)
-    case .null:
-      self = .null
-    default:
-      throw .code(.invalidIRIMapping)
-    }
+    self =
+      switch jsonValue {
+      case .null:
+        .null
+      case .string(let value):
+        .string(value)
+      default:
+        throw .code(.invalidIRIMapping)
+      }
   }
 }
