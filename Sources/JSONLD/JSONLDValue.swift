@@ -48,12 +48,8 @@ public indirect enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable
       } else if jsonObject[.set] != nil || jsonObject[.list] != nil {
         do {
           self = .setOrList(try .init(from: jsonObject))
-        } catch let jsonldError {
-          if case .code(.listOfLists) = jsonldError {
-            self = .invalid(.listOfLists)
-          } else {
-            throw jsonldError
-          }
+        } catch .code(.listOfLists) {
+          self = .invalid(.listOfLists)
         }
       } else if jsonObject[.id] != nil
         || jsonObject[.type] != nil
