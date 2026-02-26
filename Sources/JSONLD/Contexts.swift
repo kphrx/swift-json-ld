@@ -524,7 +524,7 @@ public enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable, Sendable {
       switch jsonValue {
       case .null:
         .null
-      case .string(let value):
+      case .string(let value) where JSONLDKeyword(rawValue: value) == nil:
         .string(value)
       default:
         throw .code(.invalidLanguageMapping)
@@ -548,7 +548,7 @@ public enum TermDefinitionReverse: JSONLDValueProtocol, Equatable, Sendable {
       switch jsonValue {
       case .null:
         .null
-      case .string(let value):
+      case .string(let value) where JSONLDKeyword(rawValue: value) == nil:
         .string(value)
       default:
         throw .code(.invalidIRIMapping)
