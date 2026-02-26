@@ -10,16 +10,17 @@ enum ExpansionProcessor {
   ) throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     var result: [JSONLDValue<Expanded>] = []
     for item in value {
-      if let expanded = try self.expand(
-        activeContext, value: item, property: property, insideList: insideList)
-      {
-        if case .setOrList(let setOrList) = expanded, case .set(let values, _, _) = setOrList {
-          for v in values {
-            result.append(JSONLDValue<Expanded>(v))
-          }
-        } else {
-          result.append(expanded)
-        }
+      guard
+        let expanded = try self.expand(
+          activeContext, value: item, property: property, insideList: insideList)
+      else {
+        continue
+      }
+
+      if case .setOrList(.set(let values, _, _)) = expanded {
+        result.append(contentsOf: values.map { .init($0) })
+      } else {
+        result.append(expanded)
       }
     }
     return result
@@ -48,22 +49,21 @@ enum ExpansionProcessor {
         if let typeMapping = mutableContext.typeMapping(for: property) {
           if typeMapping == "@id" {
             let expandedId = try mutableContext.expandIRI(string, asDocumentRelative: true)
-            return try .node(NodeObject<Expanded>(from: .object(["@id": .string(expandedId)])))
+            return try .node(.init(from: .object(["@id": .string(expandedId)])))
           }
           if typeMapping == "@vocab" {
             let expandedId = try mutableContext.expandIRI(string, asVocab: true)
-            return try .node(NodeObject<Expanded>(from: .object(["@id": .string(expandedId)])))
+            return try .node(.init(from: .object(["@id": .string(expandedId)])))
           }
           return try .value(
-            ValueObject<Expanded>(
-              from: .object(["@value": .string(string), "@type": .string(typeMapping)])))
+            .init(from: .object(["@value": .string(string), "@type": .string(typeMapping)])))
         } else if let languageMapping = mutableContext.languageMapping(for: property) {
           return try .value(
-            ValueObject<Expanded>(
+            .init(
               from: .object(["@value": .string(string), "@language": .string(languageMapping)])))
         }
       }
-      return try .value(ValueObject<Expanded>(from: .object(["@value": .string(string)])))
+      return try .value(.init(from: .object(["@value": .string(string)])))
 
     case .node(let nodeObject):
       var activeContext = activeContext
@@ -83,54 +83,57 @@ enum ExpansionProcessor {
       return try self.expandObject(
         activeContext, object: combinedProperties, property: property, insideList: insideList)
 
-    case .value(_):
-      return try self.expandObject(
-        activeContext, object: ["@value": .single(.iriOrTerm("dummy"))], property: property,
-        insideList: insideList)  // TODO: Proper re-expansion
+    case .value(let valueObject):
+      return .value(try .init(from: valueObject.jsonObject))
 
     case .setOrList(let setOrListObject):
       switch setOrListObject {
       case .set(let values, _, _):
-        let unresolvedItems: [JSONLDValue<Unresolved>] = values.map { JSONLDValue<Unresolved>($0) }
+        let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
         let expanded = try self.expand(
           activeContext, value: .many(unresolvedItems), property: property, insideList: insideList)
-        return try JSONLDValue<Expanded>.setOrList(
-          .set(.many(expanded.map { SetValue<Expanded>($0) }), context: nil, index: nil))
+        return try .setOrList(
+          .set(.many(expanded.map { .init($0) }), context: nil, index: nil))
       case .list(let values, _, _):
         if insideList { throw .code(.listOfLists) }
-        let unresolvedItems: [JSONLDValue<Unresolved>] = values.map { JSONLDValue<Unresolved>($0) }
+        let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
         let expanded = try self.expand(
           activeContext, value: .many(unresolvedItems), property: property, insideList: true)
-        return try JSONLDValue<Expanded>.setOrList(
-          .list(.many(expanded.map { SetValue<Expanded>($0) }), context: nil, index: nil))
+
+        for item in expanded {
+          if case .setOrList(.list) = item {
+            throw .code(.listOfLists)
+          }
+        }
+
+        return try .setOrList(
+          .list(.many(expanded.map { .init($0) }), context: nil, index: nil))
       }
 
     case .languageMap(let languageMap):
       var expandedItems: [JSONLDValue<Expanded>] = []
       for (lang, values) in languageMap.map.sorted(by: { $0.key < $1.key }) {
         for val in values {
-          if case .string(let s) = val {
-            expandedItems.append(
-              try .value(
-                .init(
-                  from: .object(["@value": .string(s), "@language": .string(lang.lowercased())])))
-            )
-          }
+          guard case .string(let s) = val else { throw .code(.invalidLanguageMapValue) }
+          expandedItems.append(
+            try .value(
+              .init(from: .object(["@value": .string(s), "@language": .string(lang.lowercased())])))
+          )
         }
       }
       return .setOrList(
-        .set(.many(expandedItems.map { SetValue<Expanded>($0) }), context: nil, index: nil))
+        .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
 
     case .indexMap(let indexMap):
       var expandedItems: [JSONLDValue<Expanded>] = []
       for (_, values) in indexMap.map.sorted(by: { $0.key < $1.key }) {
-        let unresolvedItems: [JSONLDValue<Unresolved>] = values.map { JSONLDValue<Unresolved>($0) }
+        let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
         let expanded = try self.expand(
           activeContext, value: .many(unresolvedItems), property: property, insideList: insideList)
         expandedItems.append(contentsOf: expanded)
       }
       return .setOrList(
-        .set(.many(expandedItems.map { SetValue<Expanded>($0) }), context: nil, index: nil))
+        .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
     }
   }
 
