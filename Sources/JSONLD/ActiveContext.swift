@@ -54,7 +54,6 @@ struct ActiveContext: Equatable, Sendable {
   ) throws(JSONLDError) {
     switch context {
     case .absoluteIRI(let iri), .relativeIRI(let iri):
-      // Resolving relative context IRIs for recursion check
       let resolvedIRI = try self.expandIRI(iri, asDocumentRelative: true)
 
       if remoteContexts.contains(resolvedIRI) {
@@ -157,23 +156,19 @@ struct ActiveContext: Equatable, Sendable {
     case .expanded(let expanded):
       switch expanded {
       case .standard(let standard):
-        if let id = standard.id {
-          switch id {
-          case .null:
-            break
-          case .keyword(let keyword):
-            if keyword == .context {
-              throw .code(.invalidKeywordAlias)
-            }
-            termDefinition.iri = keyword.rawValue
-          case .iriOrTerm(let iri):
-            termDefinition.iri = try self.expandIRIForDefinition(
-              iri, asVocab: true, definition: definition, term: term, defined: &defined)
-            if !self.isAbsoluteIRI(termDefinition.iri) {
-              throw .code(.invalidIRIMapping)
-            }
+        switch standard.id {
+        case .keyword(let keyword)?:
+          if keyword == .context {
+            throw .code(.invalidKeywordAlias)
           }
-        } else {
+          termDefinition.iri = keyword.rawValue
+        case .iriOrTerm(let iri)?:
+          termDefinition.iri = try self.expandIRIForDefinition(
+            iri, asVocab: true, definition: definition, term: term, defined: &defined)
+          if !self.isAbsoluteIRI(termDefinition.iri) {
+            throw .code(.invalidIRIMapping)
+          }
+        case .null?, nil:
           if term.contains(":") {
             let colonIndex = term.firstIndex(of: ":")!
             let prefix = String(term[..<colonIndex])
@@ -197,30 +192,28 @@ struct ActiveContext: Equatable, Sendable {
           }
         }
 
-        if let type = standard.type {
-          switch type {
-          case .null:
-            termDefinition.typeMapping = nil
-          case .keyword(let keyword):
-            termDefinition.typeMapping = keyword.rawValue
-          case .iriOrTerm(let iri):
-            termDefinition.typeMapping = try self.expandIRIForDefinition(
-              iri, asVocab: true, definition: definition, term: term, defined: &defined)
-            if termDefinition.typeMapping != "@id" && termDefinition.typeMapping != "@vocab"
-              && !self.isAbsoluteIRI(termDefinition.typeMapping!)
-            {
-              throw .code(.invalidTypeMapping)
-            }
+        switch standard.type {
+        case .keyword(let keyword)?:
+          if keyword == .none {
+            throw .code(.invalidTypeMapping)
           }
+          termDefinition.typeMapping = keyword.rawValue
+        case .iriOrTerm(let iri)?:
+          let typeMapping = try self.expandIRIForDefinition(
+            iri, asVocab: true, definition: definition, term: term, defined: &defined)
+          if typeMapping != "@id" && typeMapping != "@vocab" && !self.isAbsoluteIRI(typeMapping) {
+            throw .code(.invalidTypeMapping)
+          }
+          termDefinition.typeMapping = typeMapping
+        case .null?, nil:
+          termDefinition.typeMapping = nil
         }
 
-        if let language = standard.language {
-          switch language {
-          case .null:
-            termDefinition.languageMapping = nil
-          case .string(let value):
-            termDefinition.languageMapping = value.lowercased()
-          }
+        switch standard.language {
+        case .string(let value)?:
+          termDefinition.languageMapping = value.lowercased()
+        case .null?, nil:
+          termDefinition.languageMapping = nil
         }
 
         if let container = standard.container {
@@ -249,25 +242,21 @@ struct ActiveContext: Equatable, Sendable {
             }
         }
 
-        if let type = reverse.type {
-          switch type {
-          case .null:
-            termDefinition.typeMapping = nil
-          case .keyword(let keyword):
-            termDefinition.typeMapping = keyword.rawValue
-          case .iriOrTerm(let iri):
-            termDefinition.typeMapping = try self.expandIRIForDefinition(
-              iri, asVocab: true, definition: definition, term: term, defined: &defined)
-          }
+        switch reverse.type {
+        case .keyword(let keyword)?:
+          termDefinition.typeMapping = keyword.rawValue
+        case .iriOrTerm(let iri)?:
+          termDefinition.typeMapping = try self.expandIRIForDefinition(
+            iri, asVocab: true, definition: definition, term: term, defined: &defined)
+        case .null?, nil:
+          break
         }
 
-        if let language = reverse.language {
-          switch language {
-          case .null:
-            termDefinition.languageMapping = nil
-          case .string(let value):
-            termDefinition.languageMapping = value.lowercased()
-          }
+        switch reverse.language {
+        case .string(let value)?:
+          termDefinition.languageMapping = value.lowercased()
+        case .null?, nil:
+          break
         }
 
         termDefinition.localContext = reverse.context

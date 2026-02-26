@@ -53,34 +53,35 @@ public struct NodeObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
 
     self.context = try properties.extractContext()
 
-    self.id = try properties.removeValue(for: .id).map { idValue throws(JSONLDError) in
-      if case .string(let value) = idValue {
-        value
-      } else {
-        throw .code(.invalidIdValue)
+    self.id =
+      switch properties.removeValue(for: .id) {
+      case .string(let value)?: value
+      case nil: nil
+      case _?: throw .code(.invalidIdValue)
       }
-    }
 
     self.graph = try properties.removeValue(for: .graph).map(SingleOrMany.init(from:))
 
-    self.type = try properties.removeValue(for: .type).map { typeValue throws(JSONLDError) in
-      try .init(from: typeValue) { jsonValue throws(JSONLDError) in
-        if case .string(let value) = jsonValue {
-          value
-        } else {
-          throw .code(.invalidTypeValue)
+    self.type =
+      switch properties.removeValue(for: .type) {
+      case let typeValue?:
+        try .init(from: typeValue) { jsonValue throws(JSONLDError) in
+          if case .string(let value) = jsonValue {
+            value
+          } else {
+            throw .code(.invalidTypeValue)
+          }
         }
+      case nil:
+        nil
       }
-    }
 
-    self.reverse = try properties.removeValue(for: .reverse).map {
-      reverseValue throws(JSONLDError) in
-      if case .object(let value) = reverseValue {
-        try .init(from: value)
-      } else {
-        throw .code(.invalidReverseValue)
+    self.reverse =
+      switch properties.removeValue(for: .reverse) {
+      case .object(let value)?: try .init(from: value)
+      case nil: nil
+      case _?: throw .code(.invalidReverseValue)
       }
-    }
 
     self.index = try properties.extractIndex()
 
