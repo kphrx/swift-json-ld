@@ -32,15 +32,16 @@ public indirect enum SingleOrMany<T: Equatable>: Equatable {
   }
 }
 
-extension SingleOrMany: JSONLDValueProtocol, CustomJSONValueConvertible
-where T: JSONLDValueProtocol {
+extension SingleOrMany: CustomJSONValueConvertible where T: CustomJSONValueConvertible {
   public var jsonValue: JSONValue {
     switch self {
     case .single(let value): value.jsonValue
     case .many(let values): values.jsonValue
     }
   }
+}
 
+extension SingleOrMany: JSONLDValueProtocol where T: JSONLDValueProtocol {
   init(from jsonArray: JSONArray) throws(JSONLDError) {
     try self.init(from: jsonArray, mapper: T.init(from:))
   }
