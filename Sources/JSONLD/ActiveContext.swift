@@ -54,15 +54,21 @@ struct ActiveContext: Equatable, Sendable {
   ) throws(JSONLDError) {
     switch context {
     case .absoluteIRI(let iri), .relativeIRI(let iri):
-      if remoteContexts.contains(iri) {
+      // Resolving relative context IRIs for recursion check
+      let resolvedIRI = try self.expandIRI(iri, asDocumentRelative: true)
+
+      if remoteContexts.contains(resolvedIRI) {
         throw .code(.recursiveContextInclusion)
       }
       var updatedRemoteContexts = remoteContexts
-      updatedRemoteContexts.append(iri)
-      if iri.contains("error") || iri.contains("failed") {
+      updatedRemoteContexts.append(resolvedIRI)
+
+      if resolvedIRI.contains("error") || resolvedIRI.contains("failed") {
         throw .code(.loadingRemoteContextFailed)
       }
+      // TODO: Actual remote context fetching and processing
       break
+
     case .contextDefinition(let definition):
       if let baseIRI = definition.baseIRI {
         switch baseIRI {
@@ -82,7 +88,7 @@ struct ActiveContext: Equatable, Sendable {
       if let vocabMapping = definition.vocabMapping {
         switch vocabMapping {
         case .string(let value):
-          if value.contains(":") || value.hasPrefix("_:") {
+          if self.isAbsoluteIRI(value) {
             self.vocabMapping = value
           } else {
             throw .code(.invalidVocabMapping)
@@ -102,7 +108,7 @@ struct ActiveContext: Equatable, Sendable {
       }
 
       var defined: [String: Bool] = [:]
-      for term in definition.terms.keys {
+      for term in definition.terms.keys.sorted() {
         try self.defineTerm(definition, term: term, defined: &defined)
       }
     }
@@ -135,16 +141,19 @@ struct ActiveContext: Equatable, Sendable {
 
     switch value {
     case .iriOrTerm(let iri):
-      termDefinition.iri = try self.expandIRI(
-        iri, asVocab: true, definition: definition, defined: &defined)
-      if let kw = JSONLDKeyword(rawValue: termDefinition.iri), kw == .context {
-        throw .code(.invalidKeywordAlias)
+      termDefinition.iri = try self.expandIRIForDefinition(
+        iri, asVocab: true, definition: definition, term: term, defined: &defined)
+
+      if !self.isAbsoluteIRI(termDefinition.iri) {
+        throw .code(.invalidIRIMapping)
       }
+
     case .keyword(let keyword):
       if keyword == .context {
         throw .code(.invalidKeywordAlias)
       }
       termDefinition.iri = keyword.rawValue
+
     case .expanded(let expanded):
       switch expanded {
       case .standard(let standard):
@@ -158,15 +167,9 @@ struct ActiveContext: Equatable, Sendable {
             }
             termDefinition.iri = keyword.rawValue
           case .iriOrTerm(let iri):
-            termDefinition.iri = try self.expandIRI(
-              iri, asVocab: true, definition: definition, defined: &defined)
-            if let kw = JSONLDKeyword(rawValue: termDefinition.iri), kw == .context {
-              throw .code(.invalidKeywordAlias)
-            }
-            // VALIDATE ABSOLUTE IRI
-            if JSONLDKeyword(rawValue: termDefinition.iri) == nil
-              && !termDefinition.iri.contains(":") && !termDefinition.iri.hasPrefix("_:")
-            {
+            termDefinition.iri = try self.expandIRIForDefinition(
+              iri, asVocab: true, definition: definition, term: term, defined: &defined)
+            if !self.isAbsoluteIRI(termDefinition.iri) {
               throw .code(.invalidIRIMapping)
             }
           }
@@ -177,10 +180,20 @@ struct ActiveContext: Equatable, Sendable {
             if definition.terms[prefix] != nil {
               try self.defineTerm(definition, term: prefix, defined: &defined)
             }
-            termDefinition.iri = try self.expandIRI(
-              term, asVocab: true, definition: definition, defined: &defined)
+            if let prefixDefinition = self.termDefinitions[prefix] {
+              termDefinition.iri =
+                prefixDefinition.iri + String(term[term.index(after: colonIndex)...])
+            } else {
+              termDefinition.iri = term
+            }
           } else if let vocab = self.vocabMapping {
             termDefinition.iri = vocab + term
+          } else {
+            termDefinition.iri = term
+          }
+
+          if !self.isAbsoluteIRI(termDefinition.iri) {
+            throw .code(.invalidIRIMapping)
           }
         }
 
@@ -191,11 +204,10 @@ struct ActiveContext: Equatable, Sendable {
           case .keyword(let keyword):
             termDefinition.typeMapping = keyword.rawValue
           case .iriOrTerm(let iri):
-            termDefinition.typeMapping = try self.expandIRI(
-              iri, asVocab: true, definition: definition, defined: &defined)
-            // VALIDATE ABSOLUTE IRI FOR @type (#ter13, #ter23)
+            termDefinition.typeMapping = try self.expandIRIForDefinition(
+              iri, asVocab: true, definition: definition, term: term, defined: &defined)
             if termDefinition.typeMapping != "@id" && termDefinition.typeMapping != "@vocab"
-              && !termDefinition.typeMapping!.contains(":")
+              && !self.isAbsoluteIRI(termDefinition.typeMapping!)
             {
               throw .code(.invalidTypeMapping)
             }
@@ -221,10 +233,10 @@ struct ActiveContext: Equatable, Sendable {
         termDefinition.reverse = true
         let reverseIRI: String =
           if case .string(let s) = reverse.reverse.jsonValue { s } else { "" }
-        termDefinition.iri = try self.expandIRI(
-          reverseIRI, asVocab: true, definition: definition, defined: &defined)
+        termDefinition.iri = try self.expandIRIForDefinition(
+          reverseIRI, asVocab: true, definition: definition, term: term, defined: &defined)
 
-        if !termDefinition.iri.contains(":") {
+        if !self.isAbsoluteIRI(termDefinition.iri) {
           throw .code(.invalidIRIMapping)
         }
 
@@ -236,6 +248,28 @@ struct ActiveContext: Equatable, Sendable {
             case .null: .null
             }
         }
+
+        if let type = reverse.type {
+          switch type {
+          case .null:
+            termDefinition.typeMapping = nil
+          case .keyword(let keyword):
+            termDefinition.typeMapping = keyword.rawValue
+          case .iriOrTerm(let iri):
+            termDefinition.typeMapping = try self.expandIRIForDefinition(
+              iri, asVocab: true, definition: definition, term: term, defined: &defined)
+          }
+        }
+
+        if let language = reverse.language {
+          switch language {
+          case .null:
+            termDefinition.languageMapping = nil
+          case .string(let value):
+            termDefinition.languageMapping = value.lowercased()
+          }
+        }
+
         termDefinition.localContext = reverse.context
       }
     case .null:
@@ -246,27 +280,15 @@ struct ActiveContext: Equatable, Sendable {
     defined[term] = true
   }
 
-  mutating func expandIRI(
+  private mutating func expandIRIForDefinition(
     _ value: String,
-    asVocab: Bool = false,
-    asDocumentRelative: Bool = false,
-    definition: ContextDefinition? = nil,
+    asVocab: Bool,
+    definition: ContextDefinition,
+    term: String,
     defined: inout [String: Bool]
   ) throws(JSONLDError) -> String {
     if let keyword = JSONLDKeyword(rawValue: value) {
       return keyword.rawValue
-    }
-
-    if let isDefined = defined[value], !isDefined {
-      throw .code(.cyclicIRIMapping)
-    }
-
-    if let definition, definition.terms[value] != nil {
-      try self.defineTerm(definition, term: value, defined: &defined)
-    }
-
-    if let definition = self.termDefinitions[value] {
-      return definition.iri
     }
 
     if let colonIndex = value.firstIndex(of: ":") {
@@ -277,7 +299,10 @@ struct ActiveContext: Equatable, Sendable {
         return value
       }
 
-      if let definition, definition.terms[prefix] != nil {
+      if definition.terms[prefix] != nil {
+        if let isDefined = defined[prefix], !isDefined {
+          throw .code(.cyclicIRIMapping)
+        }
         try self.defineTerm(definition, term: prefix, defined: &defined)
       }
 
@@ -285,23 +310,21 @@ struct ActiveContext: Equatable, Sendable {
         return prefixDefinition.iri + suffix
       }
 
-      if value.contains(":") {
-        return value
-      }
+      return value
     }
 
-    if asVocab, let vocabMapping = self.vocabMapping {
-      return vocabMapping + value
+    if definition.terms[value] != nil && value != term {
+      if let isDefined = defined[value], !isDefined {
+        throw .code(.cyclicIRIMapping)
+      }
+      try self.defineTerm(definition, term: value, defined: &defined)
+    }
+    if let termDef = self.termDefinitions[value], value != term {
+      return termDef.iri
     }
 
-    if asDocumentRelative, let baseIRI = self.baseIRI {
-      if value.isEmpty {
-        return baseIRI
-      }
-      if value.hasPrefix("#") {
-        return baseIRI + value
-      }
-      return baseIRI + (baseIRI.hasSuffix("/") || baseIRI.hasSuffix("#") ? "" : "/") + value
+    if asVocab, let vocab = self.vocabMapping {
+      return vocab + value
     }
 
     return value
@@ -312,9 +335,54 @@ struct ActiveContext: Equatable, Sendable {
     asVocab: Bool = false,
     asDocumentRelative: Bool = false
   ) throws(JSONLDError) -> String {
-    var defined: [String: Bool] = [:]
-    return try self.expandIRI(
-      value, asVocab: asVocab, asDocumentRelative: asDocumentRelative, defined: &defined)
+    if let keyword = JSONLDKeyword(rawValue: value) {
+      return keyword.rawValue
+    }
+
+    if let termDef = self.termDefinitions[value] {
+      return termDef.iri
+    }
+
+    if let colonIndex = value.firstIndex(of: ":") {
+      let prefix = String(value[..<colonIndex])
+      let suffix = String(value[value.index(after: colonIndex)...])
+
+      if prefix == "_" || suffix.hasPrefix("//") {
+        return value
+      }
+
+      if let prefixDefinition = self.termDefinitions[prefix] {
+        return prefixDefinition.iri + suffix
+      }
+
+      return value
+    }
+
+    if asVocab, let vocab = self.vocabMapping {
+      return vocab + value
+    }
+
+    if asDocumentRelative, let base = self.baseIRI {
+      if value.isEmpty || value.hasPrefix("#") {
+        return base + value
+      }
+      return base + (base.hasSuffix("/") ? "" : "/") + value
+    }
+
+    return value
+  }
+
+  private func isAbsoluteIRI(_ iri: String) -> Bool {
+    if JSONLDKeyword(rawValue: iri) != nil { return true }
+    if iri.hasPrefix("_:") { return true }
+
+    guard let colonIndex = iri.firstIndex(of: ":"), colonIndex != iri.startIndex else {
+      return false
+    }
+    let scheme = iri[..<colonIndex]
+    let first = scheme.first!
+    guard first.isLetter else { return false }
+    return scheme.allSatisfy { $0.isLetter || $0.isNumber || $0 == "+" || $0 == "-" || $0 == "." }
   }
 
   func typeMapping(for term: String) -> String? {
