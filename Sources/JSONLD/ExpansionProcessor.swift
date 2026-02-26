@@ -190,6 +190,12 @@ enum ExpansionProcessor {
         if insideList { throw .code(.listOfLists) }
         let expandedList = try self.expand(
           activeContext, value: val, property: property, insideList: true)
+
+        for item in expandedList {
+          if case .setOrList(.list) = item {
+            throw .code(.listOfLists)
+          }
+        }
         expandedProperties[expandedProperty] = .array(expandedList.map(\.jsonValue))
 
       case .set?:
@@ -207,7 +213,15 @@ enum ExpansionProcessor {
         expandedProperties[expandedProperty] = .string(indexStr)
 
       case .reverse?:
-        break
+        if case .single(.unknown(let content)) = val,
+          let expandedReverse = try self.expandObject(
+            activeContext, object: content, property: "@reverse", insideList: false),
+          case .node(let node) = expandedReverse
+        {
+          expandedProperties[expandedProperty] = .object(node.jsonObject)
+        } else {
+          throw .code(.invalidReversePropertyMap)
+        }
 
       case nil:
         if !expandedProperty.contains(":") && !expandedProperty.hasPrefix("_:") {
@@ -221,6 +235,12 @@ enum ExpansionProcessor {
           activeContext, value: val, property: key, insideList: isListContainer || insideList)
 
         if !expandedValues.isEmpty {
+          if let termDef = activeContext.termDefinitions[key], termDef.reverse {
+            for v in expandedValues {
+              guard case .node = v else { throw .code(.invalidReversePropertyValue) }
+            }
+          }
+
           let finalValue: JSONValue =
             if isListContainer {
               .object(["@list": .array(expandedValues.map(\.jsonValue))])
