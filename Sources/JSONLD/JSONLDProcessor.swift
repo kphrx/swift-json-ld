@@ -1,0 +1,152 @@
+// Copyright 2026 kPherox
+// SPDX-License-Identifier: Apache-2.0
+
+import Foundation
+
+/// A processor for JSON-LD documents.
+public class JSONLDProcessor {
+  public var loader: any JSONLDDocumentLoader = DefaultLoader()
+  public var logger: (any JSONLDLogger)?
+
+  public init() {}
+
+  /// Expands the specified JSON-LD document.
+  public func expand(
+    _ document: JSONLDDocument<Unresolved>,
+    expandContext: JSONLDDocument<Unresolved>? = nil,
+    baseIRI: String? = nil,
+    normative: Bool = true
+  ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
+    let unresolvedValues = try document.value.map { node throws(JSONLDError) in
+      try JSONLDValue<Unresolved>(from: .object(node.jsonObject))
+    }
+
+    let values = JSONLDValues<Unresolved>(.many(unresolvedValues))
+    return try await self.expand(
+      values,
+      expandContext: expandContext,
+      baseIRI: baseIRI ?? document.documentURL,
+      normative: normative
+    )
+  }
+
+  /// Expands a collection of JSON-LD values.
+  public func expand(
+    _ values: JSONLDValues<Unresolved>,
+    expandContext: JSONLDDocument<Unresolved>? = nil,
+    baseIRI: String? = nil,
+    normative: Bool = true
+  ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
+    var activeContext = ActiveContext.empty
+    if let baseIRI {
+      activeContext.baseIRI = baseIRI
+    }
+
+    if let expandContext {
+      for contexts in expandContext.value.compactMap(\.context) {
+        activeContext = try await activeContext.process(
+          localContext: contexts, loader: self.loader, logger: self.logger)
+      }
+    }
+
+    let unresolvedValues = try values.value.map { val throws(JSONLDError) in
+      try JSONLDValue<Unresolved>(from: val.jsonValue)
+    }
+
+    let expanded = try await ExpansionProcessor.expand(
+      activeContext,
+      value: .many(unresolvedValues),
+      property: nil,
+      loader: self.loader,
+      logger: self.logger
+    )
+
+    let nodes = expanded.compactMap { item in
+      if case .node(let node) = item {
+        node
+      } else {
+        nil
+      }
+    }
+
+    return JSONLDDocument<Expanded>(.init(nodes), documentURL: baseIRI)
+  }
+
+  /// Compacts the specified JSON-LD document.
+  public func compact<P: JSONLDPhase>(
+    _ document: JSONLDDocument<P>,
+    context: JSONLDDocument<Unresolved>,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true,
+    compactToRelative: Bool = true
+  ) throws(JSONLDError) -> JSONLDDocument<P> {
+    _ = (context, baseIRI, compactArrays, compactToRelative)
+    return document
+  }
+
+  /// Compacts a collection of JSON-LD values.
+  public func compact<P: JSONLDPhase>(
+    _ values: JSONLDValues<P>,
+    context: JSONLDDocument<Unresolved>,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true,
+    compactToRelative: Bool = true
+  ) throws(JSONLDError) -> JSONLDValues<P> {
+    _ = (context, baseIRI, compactArrays, compactToRelative)
+    return values
+  }
+
+  /// Flattens the specified JSON-LD document.
+  public func flatten<P: JSONLDPhase>(
+    _ document: JSONLDDocument<P>,
+    context: JSONLDDocument<Unresolved>? = nil,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true
+  ) throws(JSONLDError) -> JSONLDDocument<P> {
+    _ = (context, baseIRI, compactArrays)
+    return document
+  }
+
+  /// Flattens a collection of JSON-LD values.
+  public func flatten<P: JSONLDPhase>(
+    _ values: JSONLDValues<P>,
+    context: JSONLDDocument<Unresolved>? = nil,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true
+  ) throws(JSONLDError) -> JSONLDValues<P> {
+    _ = (context, baseIRI, compactArrays)
+    return values
+  }
+
+  /// Fetches a document from a URL and expands it.
+  public func expand(
+    url: String,
+    expandContext: JSONLDDocument<Unresolved>? = nil,
+    normative: Bool = true
+  ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
+    let result = await self.loader.load(url: url)
+    let remoteDocument: RemoteDocument =
+      switch result {
+      case .success(let doc):
+        doc
+      case .failure(let error):
+        self.logger?.log("Failed to load remote document from \(url): \(error)", level: .error)
+        throw .code(.loadingRemoteContextFailed)
+      }
+
+    let document = try JSONLDDocument<Unresolved>(from: remoteDocument.document)
+    return try await self.expand(
+      document,
+      expandContext: expandContext,
+      baseIRI: remoteDocument.documentURL,
+      normative: normative
+    )
+  }
+}
+
+private struct DefaultLoader: JSONLDDocumentLoader {
+  func load(url: String) async -> Result<RemoteDocument, any Error> {
+    // TODO: Implementation of a default loader using URLSession or AsyncHTTPClient.
+    .failure(JSONLDError.code(.loadingRemoteContextFailed))
+  }
+}

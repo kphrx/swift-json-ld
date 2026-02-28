@@ -1,40 +1,38 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public indirect enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
-  case iriOrTerm(String)
+public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
   case node(NodeObject<P>)
   case value(ValueObject<P>)
   case setOrList(SetOrListObject<P>)
   case languageMap(LanguageMap<P>)
   case indexMap(IndexMap<P>)
+  case iriOrTerm(String)
   case unknown(P.UnknownContent)
   case invalid(InvalidValue)
 
-  public enum InvalidValue: Equatable, Sendable {
-    case notJSONLDValue
+  public enum InvalidValue: Equatable {
     case listOfLists
-
-    public var jsonValue: JSONValue {
-      .null
-    }
+    case notJSONLDValue
   }
 
   public var jsonValue: JSONValue {
     switch self {
-    case .iriOrTerm(let value): .string(value)
-    case .node(let node): node.jsonValue
-    case .value(let value): value.jsonValue
-    case .setOrList(let object): object.jsonValue
+    case .node(let nodeObject): nodeObject.jsonValue
+    case .value(let valueObject): valueObject.jsonValue
+    case .setOrList(let setOrListObject): setOrListObject.jsonValue
     case .languageMap(let languageMap): languageMap.jsonValue
     case .indexMap(let indexMap): indexMap.jsonValue
+    case .iriOrTerm(let value): .string(value)
     case .unknown(let content):
-      if let jsonObject = content as? [String: SingleOrMany<JSONLDValue<Unresolved>>] {
-        .object(jsonObject.mapValues(\.jsonValue))
+      if let rawObject = content as? JSONObject {
+        .object(rawObject)
+      } else if let unresolvedObject = content as? [String: SingleOrMany<JSONLDValue<Unresolved>>] {
+        .object(unresolvedObject.jsonObject)
       } else {
         .null
       }
-    case .invalid(let invalid): invalid.jsonValue
+    case .invalid: .null
     }
   }
 
@@ -43,23 +41,22 @@ public indirect enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable
     case .string(let string):
       self = .iriOrTerm(string)
     case .object(let jsonObject):
-      if jsonObject[.value] != nil {
+      if jsonObject.contains(.value) {
         self = .value(try .init(from: jsonObject))
-      } else if jsonObject[.set] != nil || jsonObject[.list] != nil {
+      } else if jsonObject.contains(.list) || jsonObject.contains(.set) {
         do {
           self = .setOrList(try .init(from: jsonObject))
         } catch .code(.listOfLists) {
           self = .invalid(.listOfLists)
         }
-      } else if jsonObject[.id] != nil
-        || jsonObject[.type] != nil
-        || jsonObject[.graph] != nil
-        || jsonObject[.reverse] != nil
-        || jsonObject[.context] != nil
-        || jsonObject[.index] != nil
+      } else if !jsonObject.keys.contains(where: { $0.hasPrefix("@") })
+        || jsonObject.contains(.id)
+        || jsonObject.contains(.type)
+        || jsonObject.contains(.graph)
+        || jsonObject.contains(.reverse)
+        || jsonObject.contains(.context)
+        || jsonObject.contains(.index)
       {
-        self = .node(try .init(from: jsonObject))
-      } else if !jsonObject.keys.contains(where: { $0.hasPrefix("@") }) {
         self = .node(try .init(from: jsonObject))
       } else if let content = try P.makeUnknown(from: jsonObject) {
         self = .unknown(content)
@@ -68,5 +65,34 @@ public indirect enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable
       }
     default: self = .invalid(.notJSONLDValue)
     }
+  }
+}
+
+extension JSONLDValue {
+  init(_ value: SetValue<P>) {
+    self =
+      switch value {
+      case .string(let s): .iriOrTerm(s)
+      case .integer(let i): .value(try! .init(from: .object(["@value": .integer(i)])))
+      case .float(let f): .value(try! .init(from: .object(["@value": .float(f)])))
+      case .boolean(let b): .value(try! .init(from: .object(["@value": .boolean(b)])))
+      case .null: .invalid(.notJSONLDValue)
+      case .nodeObject(let n): .node(n)
+      case .valueObject(let v): .value(v)
+      }
+  }
+
+  init(_ value: IndexValue<P>) {
+    self =
+      switch value {
+      case .string(let s): .iriOrTerm(s)
+      case .integer(let i): .value(try! .init(from: .object(["@value": .integer(i)])))
+      case .float(let f): .value(try! .init(from: .object(["@value": .float(f)])))
+      case .boolean(let b): .value(try! .init(from: .object(["@value": .boolean(b)])))
+      case .null: .invalid(.notJSONLDValue)
+      case .nodeObject(let n): .node(n)
+      case .valueObject(let v): .value(v)
+      case .setOrListObject(let s): .setOrList(s)
+      }
   }
 }

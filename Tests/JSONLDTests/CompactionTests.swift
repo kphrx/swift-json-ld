@@ -12,10 +12,13 @@ struct CompactionTests {
     "[Compaction] Positive Evaluation Test with processingMode 1.0",
     arguments: TestCaseLoader.compactionTestsPositiveCases(version: .v1p0))
   func positiveEvaluationTestOneZero(testCase: CompactTest.PositiveCase) throws {
+    let processor = JSONLDProcessor()
+    processor.loader = TestDocumentLoader()
     let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
     let context = try TestCaseLoader.load(
       testCase.options.contextFilename, type: JSONLDDocument<Unresolved>.self)
-    let actual = try input.compact(
+    let actual = try processor.compact(
+      input,
       context: context,
       baseIRI: testCase.options.base,
       compactArrays: testCase.options.compactArrays,
@@ -42,11 +45,15 @@ struct CompactionTests {
       return
     }
 
+    let processor = JSONLDProcessor()
+    processor.loader = TestDocumentLoader()
+
     #expect(throws: JSONLDError.code(expectError)) {
       let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
       let context = try TestCaseLoader.load(
         testCase.options.contextFilename, type: JSONLDDocument<Unresolved>.self)
-      _ = try input.compact(
+      _ = try processor.compact(
+        input,
         context: context,
         baseIRI: testCase.options.base,
         compactArrays: testCase.options.compactArrays,

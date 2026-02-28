@@ -72,7 +72,6 @@ struct ActiveContext: Equatable, Sendable {
         throw .code(.loadingRemoteContextFailed)
       }
 
-      // Handle Result-based loader response
       let result = await loader.load(url: resolvedIRI)
       let remoteDocument: RemoteDocument =
         switch result {

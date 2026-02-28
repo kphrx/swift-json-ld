@@ -12,17 +12,20 @@ struct FlatteningTests {
     "[Flattening] Positive Evaluation Test with processingMode 1.0",
     arguments: TestCaseLoader.flatteningTestsPositiveCases(version: .v1p0))
   func positiveEvaluationTestOneZero(testCase: FlattenTest.PositiveCase) throws {
+    let processor = JSONLDProcessor()
+    processor.loader = TestDocumentLoader()
     let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
     let context = try testCase.options.contextFilename.map { filename in
       try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
     }
-    let actual = try input.flatten(
+    let actual = try processor.flatten(
+      input,
       context: context,
       baseIRI: testCase.options.base,
       compactArrays: testCase.options.compactArrays
     )
     let expect = try TestCaseLoader.load(
-      testCase.expectFilename, type: JSONLDDocument<Expanded>.self)
+      testCase.expectFilename, type: JSONLDDocument<Unresolved>.self)
     #expect(actual.jsonValue == expect.jsonValue)
   }
 
@@ -42,12 +45,16 @@ struct FlatteningTests {
       return
     }
 
+    let processor = JSONLDProcessor()
+    processor.loader = TestDocumentLoader()
+
     #expect(throws: JSONLDError.code(expectError)) {
       let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
       let context = try testCase.options.contextFilename.map { filename in
         try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
       }
-      _ = try input.flatten(
+      _ = try processor.flatten(
+        input,
         context: context,
         baseIRI: testCase.options.base,
         compactArrays: testCase.options.compactArrays

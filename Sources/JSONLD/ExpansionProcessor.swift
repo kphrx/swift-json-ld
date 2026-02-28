@@ -132,7 +132,7 @@ enum ExpansionProcessor {
         }
       }
       return .setOrList(
-        .set(.many(expandedItems.map { SetValue<Expanded>($0) }), context: nil, index: nil))
+        .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
 
     case .indexMap(let indexMap):
       var expandedItems: [JSONLDValue<Expanded>] = []
@@ -144,7 +144,7 @@ enum ExpansionProcessor {
         expandedItems.append(contentsOf: expanded)
       }
       return .setOrList(
-        .set(.many(expandedItems.map { SetValue<Expanded>($0) }), context: nil, index: nil))
+        .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
     }
   }
 

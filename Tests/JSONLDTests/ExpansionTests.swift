@@ -12,18 +12,20 @@ struct ExpansionTests {
     "[Expansion] Positive Evaluation Test with processingMode 1.0",
     arguments: TestCaseLoader.expansionTestsPositiveCases(version: .v1p0))
   func positiveEvaluationTestOneZero(testCase: ExpandTest.PositiveCase) async throws {
+    let processor = JSONLDProcessor()
+    processor.loader = TestDocumentLoader()
     let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
     let expandContext = try testCase.options.expandContextFilename.map { filename in
       try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
     }
-    let actual = try await input.expand(
+    let actual = try await processor.expand(
+      input,
       expandContext: expandContext,
       baseIRI: testCase.options.base,
-      normative: testCase.options.normative,
-      loader: TestDocumentLoader()
+      normative: testCase.options.normative
     )
     let expect = try TestCaseLoader.load(
-      testCase.expectFilename, type: JSONLDDocument<Expanded>.self)
+      testCase.expectFilename, type: JSONLDDocument<Unresolved>.self)
     #expect(actual.jsonValue == expect.jsonValue)
   }
 
@@ -43,16 +45,19 @@ struct ExpansionTests {
       return
     }
 
+    let processor = JSONLDProcessor()
+    processor.loader = TestDocumentLoader()
+
     await #expect(throws: JSONLDError.code(expectError)) {
       let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
       let expandContext = try testCase.options.expandContextFilename.map { filename in
         try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
       }
-      _ = try await input.expand(
+      _ = try await processor.expand(
+        input,
         expandContext: expandContext,
         baseIRI: testCase.options.base,
-        normative: testCase.options.normative,
-        loader: TestDocumentLoader()
+        normative: testCase.options.normative
       )
     }
   }
