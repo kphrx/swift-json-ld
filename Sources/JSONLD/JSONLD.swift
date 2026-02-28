@@ -25,16 +25,20 @@ public struct JSONLDDocument<P: JSONLDPhase>: JSONLDValueProtocol, Equatable, De
   public func expand(
     expandContext: JSONLDDocument<Unresolved>? = nil,
     baseIRI: String? = nil,
-    normative: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument<Expanded> {
+    normative: Bool = true,
+    loader: (any JSONLDDocumentLoader)? = nil,
+    logger: (any JSONLDLogger)? = nil
+  ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
     let unresolvedValues = try self.value.map { node throws(JSONLDError) in
       try JSONLDValue<Unresolved>(from: .object(node.jsonObject))
     }
 
-    return try JSONLDValues<Unresolved>(.many(unresolvedValues)).expand(
+    return try await JSONLDValues<Unresolved>(.many(unresolvedValues)).expand(
       expandContext: expandContext,
       baseIRI: baseIRI,
-      normative: normative
+      normative: normative,
+      loader: loader,
+      logger: logger
     )
   }
 
@@ -80,8 +84,10 @@ public struct JSONLDValues<P: JSONLDPhase>: JSONLDValueProtocol, Equatable, Deco
   public func expand(
     expandContext: JSONLDDocument<Unresolved>? = nil,
     baseIRI: String? = nil,
-    normative: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument<Expanded> {
+    normative: Bool = true,
+    loader: (any JSONLDDocumentLoader)? = nil,
+    logger: (any JSONLDLogger)? = nil
+  ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
     var activeContext = ActiveContext.empty
     if let baseIRI {
       activeContext.baseIRI = baseIRI
@@ -89,7 +95,8 @@ public struct JSONLDValues<P: JSONLDPhase>: JSONLDValueProtocol, Equatable, Deco
 
     if let expandContext {
       for contexts in expandContext.value.compactMap(\.context) {
-        activeContext = try activeContext.process(localContext: contexts)
+        activeContext = try await activeContext.process(
+          localContext: contexts, loader: loader, logger: logger)
       }
     }
 
@@ -97,10 +104,12 @@ public struct JSONLDValues<P: JSONLDPhase>: JSONLDValueProtocol, Equatable, Deco
       try JSONLDValue<Unresolved>(from: val.jsonValue)
     }
 
-    let expanded = try ExpansionProcessor.expand(
+    let expanded = try await ExpansionProcessor.expand(
       activeContext,
       value: .many(unresolvedValues),
-      property: nil
+      property: nil,
+      loader: loader,
+      logger: logger
     )
 
     let nodes = expanded.compactMap { item in

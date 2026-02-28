@@ -30,18 +30,22 @@ struct ActiveContext: Equatable, Sendable {
 
   func process(
     localContext: Contexts,
-    remoteContexts: [String] = []
-  ) throws(JSONLDError) -> ActiveContext {
+    remoteContexts: [String] = [],
+    loader: (any JSONLDDocumentLoader)? = nil,
+    logger: (any JSONLDLogger)? = nil
+  ) async throws(JSONLDError) -> ActiveContext {
     var result = self
 
     switch localContext {
     case .null:
       return .empty
     case .single(let context):
-      try result.process(context: context, remoteContexts: remoteContexts)
+      try await result.process(
+        context: context, remoteContexts: remoteContexts, loader: loader, logger: logger)
     case .array(let contexts):
       for context in contexts {
-        try result.process(context: context, remoteContexts: remoteContexts)
+        try await result.process(
+          context: context, remoteContexts: remoteContexts, loader: loader, logger: logger)
       }
     }
 
@@ -50,8 +54,10 @@ struct ActiveContext: Equatable, Sendable {
 
   private mutating func process(
     context: Context,
-    remoteContexts: [String]
-  ) throws(JSONLDError) {
+    remoteContexts: [String],
+    loader: (any JSONLDDocumentLoader)?,
+    logger: (any JSONLDLogger)?
+  ) async throws(JSONLDError) {
     switch context {
     case .absoluteIRI(let iri), .relativeIRI(let iri):
       let resolvedIRI = try self.expandIRI(iri, asDocumentRelative: true)
@@ -62,11 +68,36 @@ struct ActiveContext: Equatable, Sendable {
       var updatedRemoteContexts = remoteContexts
       updatedRemoteContexts.append(resolvedIRI)
 
-      if resolvedIRI.contains("error") || resolvedIRI.contains("failed") {
+      guard let loader else {
         throw .code(.loadingRemoteContextFailed)
       }
-      // TODO: Actual remote context fetching and processing
-      break
+
+      // Handle Result-based loader response
+      let result = await loader.load(url: resolvedIRI)
+      let remoteDocument: RemoteDocument =
+        switch result {
+        case .success(let doc):
+          doc
+        case .failure(let error):
+          logger?.log(
+            "Failed to load remote context from \(resolvedIRI): \(error)", level: .error)
+          throw .code(.loadingRemoteContextFailed)
+        }
+
+      guard case .object(let obj) = remoteDocument.document,
+        let innerContext = obj[.context]
+      else {
+        throw .code(.invalidRemoteContext)
+      }
+
+      let remoteContext = try Contexts(from: innerContext)
+
+      self = try await self.process(
+        localContext: remoteContext,
+        remoteContexts: updatedRemoteContexts,
+        loader: loader,
+        logger: logger
+      )
 
     case .contextDefinition(let definition):
       if let baseIRI = definition.baseIRI {
