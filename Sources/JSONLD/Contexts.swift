@@ -245,9 +245,12 @@ public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
     let reverse = try properties.removeValue(for: .reverse).map(TermDefinitionReverse.init)
     let context = try properties.removeValue(for: .context).map(Contexts.init(from:))
     let index = properties.removeValue(for: .index)
+    let nest = properties.removeValue(for: .nest)
+    let prefix = properties.removeValue(for: .prefix)
+    let protected = properties.removeValue(for: .protected)
 
-    if index != nil {
-      // TODO: Allow @index in JSON-LD 1.1 processing mode.
+    if index != nil || context != nil || nest != nil || prefix != nil || protected != nil {
+      // TODO: Allow these keywords in JSON-LD 1.1 processing mode.
       throw .code(.invalidTermDefinition)
     }
 
@@ -263,7 +266,10 @@ public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
           language: language,
           container: reverseContainer,
           context: context,
-          index: index
+          index: index,
+          nest: nest,
+          prefix: prefix,
+          protected: protected
         ))
     } else {
       self = .standard(
@@ -273,7 +279,10 @@ public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
           language: language,
           container: container,
           context: context,
-          index: index
+          index: index,
+          nest: nest,
+          prefix: prefix,
+          protected: protected
         ))
     }
     _ = properties
@@ -288,6 +297,9 @@ extension ExpandedTermDefinition {
     let container: Container?
     let context: Contexts?
     let index: JSONValue?
+    let nest: JSONValue?
+    let prefix: JSONValue?
+    let protected: JSONValue?
 
     var jsonObject: JSONObject {
       var jsonObject: JSONObject = [:]
@@ -316,6 +328,18 @@ extension ExpandedTermDefinition {
         jsonObject[.index] = index
       }
 
+      if let nest = self.nest {
+        jsonObject[.nest] = nest
+      }
+
+      if let prefix = self.prefix {
+        jsonObject[.prefix] = prefix
+      }
+
+      if let protected = self.protected {
+        jsonObject[.protected] = protected
+      }
+
       return jsonObject
     }
   }
@@ -327,6 +351,9 @@ extension ExpandedTermDefinition {
     let container: Container?
     let context: Contexts?
     let index: JSONValue?
+    let nest: JSONValue?
+    let prefix: JSONValue?
+    let protected: JSONValue?
 
     var jsonObject: JSONObject {
       var jsonObject: JSONObject = [:]
@@ -351,6 +378,18 @@ extension ExpandedTermDefinition {
 
       if let index = self.index {
         jsonObject[.index] = index
+      }
+
+      if let nest = self.nest {
+        jsonObject[.nest] = nest
+      }
+
+      if let prefix = self.prefix {
+        jsonObject[.prefix] = prefix
+      }
+
+      if let protected = self.protected {
+        jsonObject[.protected] = protected
       }
 
       return jsonObject
