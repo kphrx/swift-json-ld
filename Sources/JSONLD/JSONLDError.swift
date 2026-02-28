@@ -48,6 +48,7 @@ public enum JSONLDError: Error, Equatable {
     case invalidReversePropertyValue = "invalid reverse property value"
 
     // JSON-LD 1.1 Processing Algorithms and API § 9.6 Error Handling § 9.6.2 JsonLdErrorCode
+    case contextOverflow = "context overflow"
     case invalidContextEntry = "invalid context entry"
     case processingModeConflict = "processing mode conflict"
   }

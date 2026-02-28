@@ -9,6 +9,9 @@ struct ActiveContext: Equatable, Sendable {
   var defaultLanguage: String?
   var termDefinitions: [String: TermDefinition]
 
+  /// The maximum number of remote contexts that can be loaded recursively.
+  static let maxRemoteContexts = 10
+
   static let empty = ActiveContext(
     baseIRI: nil,
     vocabMapping: nil,
@@ -65,6 +68,10 @@ struct ActiveContext: Equatable, Sendable {
       if remoteContexts.contains(resolvedIRI) {
         throw .code(.recursiveContextInclusion)
       }
+      if remoteContexts.count >= Self.maxRemoteContexts {
+        throw .code(.loadingRemoteContextFailed)
+      }
+
       var updatedRemoteContexts = remoteContexts
       updatedRemoteContexts.append(resolvedIRI)
 
