@@ -98,7 +98,10 @@ struct ActiveContext: Equatable, Sendable {
 
       let remoteContext = try Contexts(from: innerContext)
 
-      self = try await self.process(
+      var subContext = self
+      subContext.baseIRI = remoteDocument.documentURL
+
+      self = try await subContext.process(
         localContext: remoteContext,
         remoteContexts: updatedRemoteContexts,
         loader: loader,
@@ -111,10 +114,8 @@ struct ActiveContext: Equatable, Sendable {
         case .string(let value):
           if value.contains(":") {
             self.baseIRI = value
-          } else if let currentBase = self.baseIRI {
-            self.baseIRI = currentBase + (currentBase.hasSuffix("/") ? "" : "/") + value
           } else {
-            self.baseIRI = value
+            self.baseIRI = try self.expandIRI(value, asDocumentRelative: true)
           }
         case .null:
           self.baseIRI = nil
@@ -124,7 +125,8 @@ struct ActiveContext: Equatable, Sendable {
       if let vocabMapping = definition.vocabMapping {
         switch vocabMapping {
         case .string(let value):
-          if self.isAbsoluteIRI(value) {
+          // @vocab allows absolute IRI or blank node identifier
+          if self.isAbsoluteIRI(value) || value.hasPrefix("_:") {
             self.vocabMapping = value
           } else {
             throw .code(.invalidVocabMapping)
@@ -180,7 +182,8 @@ struct ActiveContext: Equatable, Sendable {
       termDefinition.iri = try self.expandIRIForDefinition(
         iri, asVocab: true, definition: definition, term: term, defined: &defined)
 
-      if !self.isAbsoluteIRI(termDefinition.iri) {
+      // Term mapping allows absolute IRI, keyword, or blank node identifier
+      if !self.isAbsoluteIRI(termDefinition.iri) && !termDefinition.iri.hasPrefix("_:") {
         throw .code(.invalidIRIMapping)
       }
 
@@ -202,7 +205,7 @@ struct ActiveContext: Equatable, Sendable {
         case .iriOrTerm(let iri)?:
           termDefinition.iri = try self.expandIRIForDefinition(
             iri, asVocab: true, definition: definition, term: term, defined: &defined)
-          if !self.isAbsoluteIRI(termDefinition.iri) {
+          if !self.isAbsoluteIRI(termDefinition.iri) && !termDefinition.iri.hasPrefix("_:") {
             throw .code(.invalidIRIMapping)
           }
         case .null?, nil:
@@ -224,7 +227,7 @@ struct ActiveContext: Equatable, Sendable {
             termDefinition.iri = term
           }
 
-          if !self.isAbsoluteIRI(termDefinition.iri) {
+          if !self.isAbsoluteIRI(termDefinition.iri) && !termDefinition.iri.hasPrefix("_:") {
             throw .code(.invalidIRIMapping)
           }
         }
@@ -258,6 +261,10 @@ struct ActiveContext: Equatable, Sendable {
         }
 
         termDefinition.localContext = standard.context
+        termDefinition.index = standard.index
+        termDefinition.nest = standard.nest
+        termDefinition.prefix = standard.prefix
+        termDefinition.protected = standard.protected
 
       case .reverse(let reverse):
         termDefinition.reverse = true
@@ -266,7 +273,7 @@ struct ActiveContext: Equatable, Sendable {
         termDefinition.iri = try self.expandIRIForDefinition(
           reverseIRI, asVocab: true, definition: definition, term: term, defined: &defined)
 
-        if !self.isAbsoluteIRI(termDefinition.iri) {
+        if !self.isAbsoluteIRI(termDefinition.iri) && !termDefinition.iri.hasPrefix("_:") {
           throw .code(.invalidIRIMapping)
         }
 
@@ -283,8 +290,12 @@ struct ActiveContext: Equatable, Sendable {
         case .keyword(let keyword)?:
           termDefinition.typeMapping = keyword.rawValue
         case .iriOrTerm(let iri)?:
-          termDefinition.typeMapping = try self.expandIRIForDefinition(
+          let typeMapping = try self.expandIRIForDefinition(
             iri, asVocab: true, definition: definition, term: term, defined: &defined)
+          if typeMapping != "@id" && typeMapping != "@vocab" && !self.isAbsoluteIRI(typeMapping) {
+            throw .code(.invalidTypeMapping)
+          }
+          termDefinition.typeMapping = typeMapping
         case .null?, nil:
           break
         }
@@ -297,6 +308,10 @@ struct ActiveContext: Equatable, Sendable {
         }
 
         termDefinition.localContext = reverse.context
+        termDefinition.index = reverse.index
+        termDefinition.nest = reverse.nest
+        termDefinition.prefix = reverse.prefix
+        termDefinition.protected = reverse.protected
       }
     case .null:
       break
@@ -388,11 +403,13 @@ struct ActiveContext: Equatable, Sendable {
       return vocab + value
     }
 
-    if asDocumentRelative, let base = self.baseIRI {
-      if value.isEmpty || value.hasPrefix("#") {
-        return base + value
+    if asDocumentRelative, let baseIRI = self.baseIRI {
+      if let baseURL = URL(string: baseIRI),
+        let resolvedURL = URL(string: value, relativeTo: baseURL)
+      {
+        return resolvedURL.absoluteString
       }
-      return base + (base.hasSuffix("/") ? "" : "/") + value
+      return baseIRI + (baseIRI.hasSuffix("/") ? "" : "/") + value
     }
 
     return value
@@ -400,8 +417,19 @@ struct ActiveContext: Equatable, Sendable {
 
   private func isAbsoluteIRI(_ iri: String) -> Bool {
     if JSONLDKeyword(rawValue: iri) != nil { return true }
-    if iri.hasPrefix("_:") { return true }
 
+    // NOTE: URL(string:) might accept blank node identifiers depending on implementation,
+    // but JSON-LD distinguishes them from absolute IRIs.
+    if iri.hasPrefix("_:") {
+      return false
+    }
+
+    // Use URL to check for absolute scheme.
+    if let url = URL(string: iri), url.scheme != nil {
+      return true
+    }
+
+    // Fallback for cases where URL might fail but it's a valid IRI
     guard let colonIndex = iri.firstIndex(of: ":"), colonIndex != iri.startIndex else {
       return false
     }
@@ -431,6 +459,10 @@ struct TermDefinition: Equatable, Sendable {
   var languageMapping: String?
   var containerMapping: ExpandedTermDefinition.Container
   var localContext: Contexts?
+  var index: JSONValue?
+  var nest: JSONValue?
+  var prefix: JSONValue?
+  var protected: JSONValue?
 
   init(
     iri: String,
@@ -438,7 +470,11 @@ struct TermDefinition: Equatable, Sendable {
     typeMapping: String? = nil,
     languageMapping: String? = nil,
     containerMapping: ExpandedTermDefinition.Container = .null,
-    localContext: Contexts? = nil
+    localContext: Contexts? = nil,
+    index: JSONValue? = nil,
+    nest: JSONValue? = nil,
+    prefix: JSONValue? = nil,
+    protected: JSONValue? = nil
   ) {
     self.iri = iri
     self.reverse = reverse
@@ -446,5 +482,9 @@ struct TermDefinition: Equatable, Sendable {
     self.languageMapping = languageMapping
     self.containerMapping = containerMapping
     self.localContext = localContext
+    self.index = index
+    self.nest = nest
+    self.prefix = prefix
+    self.protected = protected
   }
 }

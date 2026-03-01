@@ -14,16 +14,23 @@ struct ExpansionTests {
   func positiveEvaluationTestOneZero(testCase: ExpandTest.PositiveCase) async throws {
     let processor = JSONLDProcessor()
     processor.loader = TestDocumentLoader()
+
     let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
     let expandContext = try testCase.options.expandContextFilename.map { filename in
       try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
     }
+
+    // JSON-LD Test Suite base URL
+    let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
+    let documentIRI = manifestBase + testCase.input
+
     let actual = try await processor.expand(
       input,
       expandContext: expandContext,
-      baseIRI: testCase.options.base,
+      baseIRI: testCase.options.base ?? documentIRI,
       normative: testCase.options.normative
     )
+
     let expect = try TestCaseLoader.load(
       testCase.expectFilename, type: JSONLDDocument<Unresolved>.self)
     #expect(actual.jsonValue == expect.jsonValue)
@@ -48,6 +55,10 @@ struct ExpansionTests {
     let processor = JSONLDProcessor()
     processor.loader = TestDocumentLoader()
 
+    // JSON-LD Test Suite base URL
+    let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
+    let documentIRI = manifestBase + testCase.input
+
     await #expect(throws: JSONLDError.code(expectError)) {
       let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
       let expandContext = try testCase.options.expandContextFilename.map { filename in
@@ -56,7 +67,7 @@ struct ExpansionTests {
       _ = try await processor.expand(
         input,
         expandContext: expandContext,
-        baseIRI: testCase.options.base,
+        baseIRI: testCase.options.base ?? documentIRI,
         normative: testCase.options.normative
       )
     }
