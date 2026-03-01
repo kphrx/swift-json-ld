@@ -328,6 +328,10 @@ enum ExpansionProcessor {
       }
     }
 
+    if let typeVal = expandedProperties[.type], case .array(let types) = typeVal, types.isEmpty {
+      _ = expandedProperties.removeValue(for: .type)
+    }
+
     if let valueVal = expandedProperties[.value] {
       for key in expandedProperties.keys {
         guard let k = JSONLDKeyword(rawValue: key) else { throw .code(.invalidValueObject) }
@@ -353,6 +357,11 @@ enum ExpansionProcessor {
         }
       }
 
+      // If property is null or @graph, and it's a value object, it's dropped.
+      if property == nil || property == "@graph" {
+        return nil
+      }
+
       return try .value(.init(from: .object(expandedProperties)))
     }
 
@@ -360,11 +369,41 @@ enum ExpansionProcessor {
       if expandedProperties.count > (expandedProperties.keys.contains("@index") ? 2 : 1) {
         throw .code(.invalidSetOrListObject)
       }
+      // If property is null or @graph, and it's a list object, it's dropped.
+      if property == nil || property == "@graph" {
+        return nil
+      }
+      return try .setOrList(.init(from: .object(expandedProperties)))
+    }
+
+    if let setVal = expandedProperties[.set] {
+      if expandedProperties.count > (expandedProperties.keys.contains("@index") ? 2 : 1) {
+        throw .code(.invalidSetOrListObject)
+      }
+      // If property is null or @graph, and it's a set object, return its @set value.
+      if property == nil || property == "@graph" {
+        return try JSONLDValue<Expanded>(from: setVal)
+      }
       return try .setOrList(.init(from: .object(expandedProperties)))
     }
 
     if expandedProperties.isEmpty && expandedProperties[.id] == nil
       && expandedProperties[.graph] == nil
+    {
+      return nil
+    }
+
+    // If result contains only @language or only @index, it's dropped.
+    if expandedProperties.count == 1,
+      expandedProperties.keys.contains("@language") || expandedProperties.keys.contains("@index")
+    {
+      return nil
+    }
+
+    // If result is a node object and it is a free-floating node, result is set to null.
+    // A node object is free-floating if it consists only of an @id entry.
+    if property == nil || property == "@graph",
+      expandedProperties.count == 1, expandedProperties.keys.contains("@id")
     {
       return nil
     }

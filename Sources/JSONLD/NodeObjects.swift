@@ -60,7 +60,24 @@ public struct NodeObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
       case _?: throw .code(.invalidIdValue)
       }
 
-    self.graph = try properties.removeValue(for: .graph).map(SingleOrMany.init(from:))
+    self.graph = try properties.removeValue(for: .graph).map { graphValue throws(JSONLDError) in
+      switch graphValue {
+      case .object(let obj):
+        if case .node(let node) = try JSONLDValue<P>(from: .object(obj)) {
+          return .single(node)
+        }
+        return nil
+      case .array(let arr):
+        let nodes = try arr.map(JSONLDValue<P>.init(from:)).compactMap {
+          if case .node(let node) = $0 { node } else { nil }
+        }
+        return nodes.isEmpty ? nil : .many(nodes)
+      case .null:
+        return nil
+      default:
+        throw .internalError(.notObject)
+      }
+    }.flatMap { $0 }
 
     self.type =
       switch properties.removeValue(for: .type) {

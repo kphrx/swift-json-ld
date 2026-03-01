@@ -25,9 +25,7 @@ public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
     case .indexMap(let indexMap): indexMap.jsonValue
     case .iriOrTerm(let value): .string(value)
     case .unknown(let content):
-      if let rawObject = content as? JSONObject {
-        .object(rawObject)
-      } else if let unresolvedObject = content as? [String: SingleOrMany<JSONLDValue<Unresolved>>] {
+      if let unresolvedObject = content as? [String: SingleOrMany<JSONLDValue<Unresolved>>] {
         .object(unresolvedObject.jsonObject)
       } else {
         .null
@@ -63,7 +61,8 @@ public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
       } else {
         self = .invalid(.notJSONLDValue)
       }
-    default: self = .invalid(.notJSONLDValue)
+    default:
+      self = .invalid(.notJSONLDValue)
     }
   }
 }

@@ -4,8 +4,14 @@
 import Foundation
 
 /// A processor for JSON-LD documents.
+///
+/// This class handles operations like expansion, compaction, and flattening.
+/// It maintains configuration settings like the document loader and logger.
 public class JSONLDProcessor {
+  /// The loader used to resolve remote documents and contexts.
   public var loader: any JSONLDDocumentLoader = DefaultLoader()
+
+  /// An optional logger for capturing internal events.
   public var logger: (any JSONLDLogger)?
 
   public init() {}
