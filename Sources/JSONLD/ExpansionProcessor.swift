@@ -186,7 +186,7 @@ enum ExpansionProcessor {
         for item in val {
           guard case .iriOrTerm(let s) = item else { throw .code(.invalidTypeValue) }
           let expandedType = try activeContext.expandIRI(s, asVocab: true)
-          expandedTypes.append(.string(try validateIRI(expandedType, code: .invalidTypeMapping)))
+          expandedTypes.append(.string(expandedType))
         }
         expandedProperties[expandedProperty] = .array(expandedTypes)
 
@@ -249,11 +249,49 @@ enum ExpansionProcessor {
         }
 
         let container = activeContext.containerMapping(for: key)
-        let isListContainer = (container == .list)
+        let expandedValues: [JSONLDValue<Expanded>]
 
-        let expandedValues = try await self.expand(
-          activeContext, value: val, property: key, insideList: isListContainer || insideList,
-          loader: loader, logger: logger)
+        let isLanguageMap: Bool =
+          if container == .language {
+            switch val {
+            case .single(.unknown), .single(.node): true
+            default: false
+            }
+          } else {
+            false
+          }
+
+        if isLanguageMap {
+          let map: [String: SingleOrMany<JSONLDValue<Unresolved>>] =
+            switch val {
+            case .single(.unknown(let m)): m
+            case .single(.node(let node)): node.properties
+            default: [:]
+            }
+
+          var values: [JSONLDValue<Expanded>] = []
+          for (lang, langVal) in map.sorted(by: { $0.key < $1.key }) {
+            for item in langVal {
+              let json = item.jsonValue
+              guard case .string(let s) = json else {
+                throw .code(.invalidLanguageMapValue)
+              }
+              values.append(
+                try .value(
+                  .init(
+                    from: .object([
+                      "@value": .string(s),
+                      "@language": .string(lang.lowercased()),
+                    ]))))
+            }
+          }
+          expandedValues = values
+        } else {
+          let isListContainer = (container == .list)
+          expandedValues = try await self.expand(
+            activeContext, value: val, property: key, insideList: isListContainer || insideList,
+            loader: loader, logger: logger)
+        }
 
         if !expandedValues.isEmpty {
           if let termDef = activeContext.termDefinitions[key], termDef.reverse {
@@ -263,7 +301,7 @@ enum ExpansionProcessor {
           }
 
           let finalValue: JSONValue =
-            if isListContainer {
+            if container == .list {
               .object(["@list": .array(expandedValues.map(\.jsonValue))])
             } else {
               .array(expandedValues.map(\.jsonValue))

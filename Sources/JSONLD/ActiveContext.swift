@@ -125,7 +125,6 @@ struct ActiveContext: Equatable, Sendable {
       if let vocabMapping = definition.vocabMapping {
         switch vocabMapping {
         case .string(let value):
-          // @vocab allows absolute IRI or blank node identifier
           if self.isAbsoluteIRI(value) || value.hasPrefix("_:") {
             self.vocabMapping = value
           } else {
@@ -182,7 +181,6 @@ struct ActiveContext: Equatable, Sendable {
       termDefinition.iri = try self.expandIRIForDefinition(
         iri, asVocab: true, definition: definition, term: term, defined: &defined)
 
-      // Term mapping allows absolute IRI, keyword, or blank node identifier
       if !self.isAbsoluteIRI(termDefinition.iri) && !termDefinition.iri.hasPrefix("_:") {
         throw .code(.invalidIRIMapping)
       }
@@ -403,13 +401,12 @@ struct ActiveContext: Equatable, Sendable {
       return vocab + value
     }
 
-    if asDocumentRelative, let baseIRI = self.baseIRI {
+    if asDocumentRelative || asVocab, let baseIRI = self.baseIRI {
       if let baseURL = URL(string: baseIRI),
         let resolvedURL = URL(string: value, relativeTo: baseURL)
       {
         return resolvedURL.absoluteString
       }
-      return baseIRI + (baseIRI.hasSuffix("/") ? "" : "/") + value
     }
 
     return value
@@ -418,18 +415,14 @@ struct ActiveContext: Equatable, Sendable {
   private func isAbsoluteIRI(_ iri: String) -> Bool {
     if JSONLDKeyword(rawValue: iri) != nil { return true }
 
-    // NOTE: URL(string:) might accept blank node identifiers depending on implementation,
-    // but JSON-LD distinguishes them from absolute IRIs.
     if iri.hasPrefix("_:") {
       return false
     }
 
-    // Use URL to check for absolute scheme.
     if let url = URL(string: iri), url.scheme != nil {
       return true
     }
 
-    // Fallback for cases where URL might fail but it's a valid IRI
     guard let colonIndex = iri.firstIndex(of: ":"), colonIndex != iri.startIndex else {
       return false
     }
