@@ -4,7 +4,7 @@
 public struct NodeObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
   let context: Contexts?
   let id: String?
-  let graph: SingleOrMany<NodeObject<P>>?
+  let graph: SingleOrMany<JSONLDValue<P>>?
   let type: SingleOrMany<String>?
   let reverse: ReversePropertyMap<P>?
   let index: String?
@@ -63,15 +63,10 @@ public struct NodeObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
     self.graph = try properties.removeValue(for: .graph).map { graphValue throws(JSONLDError) in
       switch graphValue {
       case .object(let obj):
-        if case .node(let node) = try JSONLDValue<P>(from: .object(obj)) {
-          return .single(node)
-        }
-        return nil
+        return .single(try .init(from: .object(obj)))
       case .array(let arr):
-        let nodes = try arr.map(JSONLDValue<P>.init(from:)).compactMap {
-          if case .node(let node) = $0 { node } else { nil }
-        }
-        return nodes.isEmpty ? nil : .many(nodes)
+        let values = try arr.map(JSONLDValue<P>.init(from:))
+        return values.isEmpty ? nil : .many(values)
       case .null:
         return nil
       default:

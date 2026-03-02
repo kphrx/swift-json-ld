@@ -8,6 +8,10 @@ public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
   case languageMap(LanguageMap<P>)
   case indexMap(IndexMap<P>)
   case iriOrTerm(String)
+  case integer(Int)
+  case float(Double)
+  case boolean(Bool)
+  case null
   case unknown(P.UnknownContent)
   case invalid(InvalidValue)
 
@@ -24,6 +28,10 @@ public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
     case .languageMap(let languageMap): languageMap.jsonValue
     case .indexMap(let indexMap): indexMap.jsonValue
     case .iriOrTerm(let value): .string(value)
+    case .integer(let value): .integer(value)
+    case .float(let value): .float(value)
+    case .boolean(let value): .boolean(value)
+    case .null: .null
     case .unknown(let content):
       if let unresolvedObject = content as? [String: SingleOrMany<JSONLDValue<Unresolved>>] {
         .object(unresolvedObject.jsonObject)
@@ -38,6 +46,16 @@ public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
     switch jsonValue {
     case .string(let string):
       self = .iriOrTerm(string)
+    case .integer(let integer):
+      self = .integer(integer)
+    case .float(let float):
+      self = .float(float)
+    case .boolean(let boolean):
+      self = .boolean(boolean)
+    case .null:
+      self = .null
+    case .array:
+      self = .invalid(.notJSONLDValue)
     case .object(let jsonObject):
       if jsonObject.contains(.value) {
         self = .value(try .init(from: jsonObject))
@@ -61,8 +79,6 @@ public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
       } else {
         self = .invalid(.notJSONLDValue)
       }
-    default:
-      self = .invalid(.notJSONLDValue)
     }
   }
 }

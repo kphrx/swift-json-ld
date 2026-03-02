@@ -5,30 +5,38 @@ import Foundation
 
 struct ActiveContext: Equatable, Sendable {
   var baseIRI: String?
+  var originalBaseIRI: String?
   var vocabMapping: String?
   var defaultLanguage: String?
   var termDefinitions: [String: TermDefinition]
+  var nullTerms: Set<String>
 
   /// The maximum number of remote contexts that can be loaded recursively.
   static let maxRemoteContexts = 10
 
   static let empty = ActiveContext(
     baseIRI: nil,
+    originalBaseIRI: nil,
     vocabMapping: nil,
     defaultLanguage: nil,
-    termDefinitions: [:]
+    termDefinitions: [:],
+    nullTerms: []
   )
 
   init(
     baseIRI: String? = nil,
+    originalBaseIRI: String? = nil,
     vocabMapping: String? = nil,
     defaultLanguage: String? = nil,
-    termDefinitions: [String: TermDefinition] = [:]
+    termDefinitions: [String: TermDefinition] = [:],
+    nullTerms: Set<String> = []
   ) {
     self.baseIRI = baseIRI
+    self.originalBaseIRI = originalBaseIRI
     self.vocabMapping = vocabMapping
     self.defaultLanguage = defaultLanguage
     self.termDefinitions = termDefinitions
+    self.nullTerms = nullTerms
   }
 
   func process(
@@ -41,7 +49,7 @@ struct ActiveContext: Equatable, Sendable {
 
     switch localContext {
     case .null:
-      return .empty
+      return .init(baseIRI: self.originalBaseIRI, originalBaseIRI: self.originalBaseIRI)
     case .single(let context):
       try await result.process(
         context: context, remoteContexts: remoteContexts, loader: loader, logger: logger)
@@ -112,7 +120,9 @@ struct ActiveContext: Equatable, Sendable {
       if let baseIRI = definition.baseIRI {
         switch baseIRI {
         case .string(let value):
-          if value.contains(":") {
+          if value.isEmpty {
+            self.baseIRI = self.originalBaseIRI ?? self.baseIRI
+          } else if value.contains(":") {
             self.baseIRI = value
           } else {
             self.baseIRI = try self.expandIRI(value, asDocumentRelative: true)
@@ -170,6 +180,7 @@ struct ActiveContext: Equatable, Sendable {
 
     if case .null = value {
       self.termDefinitions[term] = nil
+      self.nullTerms.insert(term)
       defined[term] = true
       return
     }
@@ -206,7 +217,12 @@ struct ActiveContext: Equatable, Sendable {
           if !self.isAbsoluteIRI(termDefinition.iri) && !termDefinition.iri.hasPrefix("_:") {
             throw .code(.invalidIRIMapping)
           }
-        case .null?, nil:
+        case .null?:
+          self.termDefinitions[term] = nil
+          self.nullTerms.insert(term)
+          defined[term] = true
+          return
+        case nil:
           if term.contains(":") {
             let colonIndex = term.firstIndex(of: ":")!
             let prefix = String(term[..<colonIndex])
@@ -250,8 +266,13 @@ struct ActiveContext: Equatable, Sendable {
         switch standard.language {
         case .string(let value)?:
           termDefinition.languageMapping = value.lowercased()
-        case .null?, nil:
+          termDefinition.languageMappingDefined = true
+        case .null?:
           termDefinition.languageMapping = nil
+          termDefinition.languageMappingDefined = true
+        case nil:
+          termDefinition.languageMapping = nil
+          termDefinition.languageMappingDefined = false
         }
 
         if let container = standard.container {
@@ -301,8 +322,13 @@ struct ActiveContext: Equatable, Sendable {
         switch reverse.language {
         case .string(let value)?:
           termDefinition.languageMapping = value.lowercased()
-        case .null?, nil:
-          break
+          termDefinition.languageMappingDefined = true
+        case .null?:
+          termDefinition.languageMapping = nil
+          termDefinition.languageMappingDefined = true
+        case nil:
+          termDefinition.languageMapping = nil
+          termDefinition.languageMappingDefined = false
         }
 
         termDefinition.localContext = reverse.context
@@ -315,6 +341,7 @@ struct ActiveContext: Equatable, Sendable {
       break
     }
 
+    self.nullTerms.remove(term)
     self.termDefinitions[term] = termDefinition
     defined[term] = true
   }
@@ -328,6 +355,10 @@ struct ActiveContext: Equatable, Sendable {
   ) throws(JSONLDError) -> String {
     if let keyword = JSONLDKeyword(rawValue: value) {
       return keyword.rawValue
+    }
+
+    if self.nullTerms.contains(value) {
+      return value
     }
 
     if let colonIndex = value.firstIndex(of: ":") {
@@ -378,6 +409,10 @@ struct ActiveContext: Equatable, Sendable {
       return keyword.rawValue
     }
 
+    if self.nullTerms.contains(value) {
+      return value
+    }
+
     if let termDef = self.termDefinitions[value] {
       return termDef.iri
     }
@@ -401,11 +436,11 @@ struct ActiveContext: Equatable, Sendable {
       return vocab + value
     }
 
-    if asDocumentRelative || asVocab, let baseIRI = self.baseIRI {
+    if asDocumentRelative, let baseIRI = self.baseIRI {
       if let baseURL = URL(string: baseIRI),
         let resolvedURL = URL(string: value, relativeTo: baseURL)
       {
-        return resolvedURL.absoluteString
+        return Self.normalizeResolvedIRI(resolvedURL.absoluteString)
       }
     }
 
@@ -432,12 +467,43 @@ struct ActiveContext: Equatable, Sendable {
     return scheme.allSatisfy { $0.isLetter || $0.isNumber || $0 == "+" || $0 == "-" || $0 == "." }
   }
 
+  private static func normalizeResolvedIRI(_ iri: String) -> String {
+    guard var components = URLComponents(string: iri) else { return iri }
+    components.percentEncodedPath = Self.removeDotSegments(components.percentEncodedPath)
+    return components.string ?? iri
+  }
+
+  private static func removeDotSegments(_ path: String) -> String {
+    let isAbsolute = path.hasPrefix("/")
+    let hasTrailingSlash = path.hasSuffix("/")
+    var output: [Substring] = []
+
+    for segment in path.split(separator: "/", omittingEmptySubsequences: false) {
+      if segment.isEmpty || segment == "." { continue }
+      if segment == ".." {
+        if !output.isEmpty { _ = output.removeLast() }
+      } else {
+        output.append(segment)
+      }
+    }
+
+    var normalized = output.joined(separator: "/")
+    if isAbsolute { normalized = "/" + normalized }
+    if hasTrailingSlash && !normalized.hasSuffix("/") { normalized += "/" }
+    if normalized.isEmpty { return isAbsolute ? "/" : "" }
+    return normalized
+  }
+
   func typeMapping(for term: String) -> String? {
     self.termDefinitions[term]?.typeMapping
   }
 
   func languageMapping(for term: String) -> String? {
     self.termDefinitions[term]?.languageMapping
+  }
+
+  func hasLanguageMapping(for term: String) -> Bool {
+    self.termDefinitions[term]?.languageMappingDefined ?? false
   }
 
   func containerMapping(for term: String) -> ExpandedTermDefinition.Container {
@@ -450,6 +516,7 @@ struct TermDefinition: Equatable, Sendable {
   var reverse: Bool
   var typeMapping: String?
   var languageMapping: String?
+  var languageMappingDefined: Bool
   var containerMapping: ExpandedTermDefinition.Container
   var localContext: Contexts?
   var index: JSONValue?
@@ -462,6 +529,7 @@ struct TermDefinition: Equatable, Sendable {
     reverse: Bool = false,
     typeMapping: String? = nil,
     languageMapping: String? = nil,
+    languageMappingDefined: Bool = false,
     containerMapping: ExpandedTermDefinition.Container = .null,
     localContext: Contexts? = nil,
     index: JSONValue? = nil,
@@ -473,6 +541,7 @@ struct TermDefinition: Equatable, Sendable {
     self.reverse = reverse
     self.typeMapping = typeMapping
     self.languageMapping = languageMapping
+    self.languageMappingDefined = languageMappingDefined
     self.containerMapping = containerMapping
     self.localContext = localContext
     self.index = index

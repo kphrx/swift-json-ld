@@ -23,9 +23,7 @@ public class JSONLDProcessor {
     baseIRI: String? = nil,
     normative: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
-    let unresolvedValues = try document.value.map { node throws(JSONLDError) in
-      try JSONLDValue<Unresolved>(from: .object(node.jsonObject))
-    }
+    let unresolvedValues = document.value.map(JSONLDValue<Unresolved>.node)
 
     let values = JSONLDValues<Unresolved>(.many(unresolvedValues))
     return try await self.expand(
@@ -46,6 +44,7 @@ public class JSONLDProcessor {
     var activeContext = ActiveContext.empty
     if let baseIRI {
       activeContext.baseIRI = baseIRI
+      activeContext.originalBaseIRI = baseIRI
     }
 
     if let expandContext {
@@ -55,23 +54,32 @@ public class JSONLDProcessor {
       }
     }
 
-    let unresolvedValues = try values.value.map { val throws(JSONLDError) in
-      try JSONLDValue<Unresolved>(from: val.jsonValue)
-    }
-
     let expanded = try await ExpansionProcessor.expand(
       activeContext,
-      value: .many(unresolvedValues),
+      value: values.value,
       property: nil,
       loader: self.loader,
       logger: self.logger
     )
 
-    let nodes = expanded.compactMap { item in
-      if case .node(let node) = item {
-        node
+    var nodes: [NodeObject<Expanded>] = []
+    for item in expanded {
+      guard case .node(let node) = item else { continue }
+
+      if let graph = node.graph,
+        node.context == nil,
+        node.id == nil,
+        node.type == nil,
+        node.reverse == nil,
+        node.index == nil,
+        node.properties.isEmpty
+      {
+        nodes.append(
+          contentsOf: graph.compactMap {
+            if case .node(let node) = $0 { node } else { nil }
+          })
       } else {
-        nil
+        nodes.append(node)
       }
     }
 
