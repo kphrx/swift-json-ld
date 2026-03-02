@@ -4,124 +4,335 @@
 import Foundation
 
 struct FlatteningAlgorithm {
+  private static let defaultGraph = "@default"
+
   private var blankNodeCounter = 0
-  private var graphs: [String: [String: JSONObject]]
-  private var references: Set<String> = []
-  private static let defaultGraphName = "@default"
+  private var blankNodeMap: [String: String] = [:]
+  private var nodeMap: [String: [String: JSONObject]] = [Self.defaultGraph: [:]]
 
-  init() {
-    self.graphs = [Self.defaultGraphName: [:]]
-  }
-
-  static func run(_ document: JSONLDDocument<Expanded>) -> JSONLDDocument<Unresolved> {
+  static func run(_ document: JSONLDDocument<Expanded>) throws(JSONLDError)
+    -> JSONLDDocument<Unresolved>
+  {
     var algorithm = Self()
-    let objects = document.value.map(\.jsonObject)
-    for object in objects {
-      let _ = algorithm.processNodeObject(object, activeGraph: Self.defaultGraphName)
-    }
+    var list: [JSONValue]? = nil
+    try algorithm.generate(
+      .array(document.value.map(\.jsonValue)),
+      activeGraph: Self.defaultGraph,
+      activeSubject: nil,
+      activeProperty: nil,
+      list: &list
+    )
 
-    var defaultGraph = algorithm.graphs[Self.defaultGraphName] ?? [:]
-    for (graphName, namedGraph) in algorithm.graphs where graphName != Self.defaultGraphName {
-      var graphNode = defaultGraph[graphName] ?? [JSONLDKeyword.id.rawValue: .string(graphName)]
-      let flattenedNamedGraph =
-        namedGraph
+    var defaultGraph = algorithm.nodeMap[Self.defaultGraph] ?? [:]
+    for (graphName, graph) in algorithm.nodeMap where graphName != Self.defaultGraph {
+      var entry = defaultGraph[graphName] ?? [JSONLDKeyword.id.rawValue: .string(graphName)]
+      let flattenedGraph =
+        graph
         .sorted(by: { $0.key < $1.key })
-        .compactMap { _, node in algorithm.shouldInclude(node: node) ? node : nil }
-      if !flattenedNamedGraph.isEmpty {
-        graphNode[.graph] = .array(flattenedNamedGraph.map(JSONValue.object))
-        defaultGraph[graphName] = graphNode
+        .compactMap { _, node -> JSONObject? in
+          algorithm.shouldInclude(node)
+        }
+      if !flattenedGraph.isEmpty {
+        entry[.graph] = .array(flattenedGraph.map(JSONValue.object))
+        defaultGraph[graphName] = entry
       }
     }
 
     let flattened =
       defaultGraph
       .sorted(by: { $0.key < $1.key })
-      .compactMap { _, node -> JSONObject? in algorithm.shouldInclude(node: node) ? node : nil }
-
-    let json: JSONValue = .array(flattened.map(JSONValue.object))
-    return (try? .init(from: json)) ?? .init(.many([]))
-  }
-
-  private mutating func processNodeObject(_ object: JSONObject, activeGraph: String) -> String {
-    let id = object[.id]?.stringValue ?? self.nextBlankNodeID()
-    var graph = self.graphs[activeGraph] ?? [:]
-    var current = graph[id] ?? [JSONLDKeyword.id.rawValue: .string(id)]
-
-    for (key, value) in object {
-      if key == JSONLDKeyword.id.rawValue { continue }
-      if key == JSONLDKeyword.graph.rawValue, case .array(let graphValues) = value {
-        let namedGraph = self.graphs[id] ?? [:]
-        self.graphs[id] = namedGraph
-        for graphValue in graphValues {
-          if case .object(let graphObject) = graphValue {
-            let _ = self.processNodeObject(graphObject, activeGraph: id)
-          }
-        }
-        continue
+      .compactMap { _, node -> JSONObject? in
+        algorithm.shouldInclude(node)
       }
 
-      let processed = self.processValue(value, activeGraph: activeGraph)
-      self.mergeProperty(&current, key: key, value: processed)
+    return try .init(from: .array(flattened.map(JSONValue.object)))
+  }
+
+  private mutating func generate(
+    _ element: JSONValue,
+    activeGraph: String,
+    activeSubject: String?,
+    activeProperty: String?,
+    list: inout [JSONValue]?
+  ) throws(JSONLDError) {
+    switch element {
+    case .array(let array):
+      for item in array {
+        try self.generate(
+          item,
+          activeGraph: activeGraph,
+          activeSubject: activeSubject,
+          activeProperty: activeProperty,
+          list: &list
+        )
+      }
+
+    case .object(let object):
+      if object[.value] != nil {
+        try self.addResult(
+          .object(object),
+          activeGraph: activeGraph,
+          activeSubject: activeSubject,
+          activeProperty: activeProperty,
+          list: &list
+        )
+        return
+      }
+
+      if let listObject = object[.list], case .array(let listValues) = listObject {
+        var resultList: [JSONValue]? = []
+        for item in listValues {
+          try self.generate(
+            item,
+            activeGraph: activeGraph,
+            activeSubject: nil,
+            activeProperty: nil,
+            list: &resultList
+          )
+        }
+        let listValue: JSONValue = .object([JSONLDKeyword.list.rawValue: .array(resultList ?? [])])
+        try self.addResult(
+          listValue,
+          activeGraph: activeGraph,
+          activeSubject: activeSubject,
+          activeProperty: activeProperty,
+          list: &list
+        )
+        return
+      }
+
+      try self.generateNodeObject(
+        object,
+        activeGraph: activeGraph,
+        activeSubject: activeSubject,
+        activeProperty: activeProperty,
+        list: &list,
+        idFromInput: true
+      )
+
+    default:
+      break
     }
-    graph[id] = current
-    self.graphs[activeGraph] = graph
+  }
+
+  private mutating func generateNodeObject(
+    _ object: JSONObject,
+    activeGraph: String,
+    activeSubject: String?,
+    activeProperty: String?,
+    list: inout [JSONValue]?,
+    idFromInput: Bool
+  ) throws(JSONLDError) {
+    var object = object
+    let id =
+      if let rawID = object.removeValue(for: .id)?.stringValue {
+        self.normalizeNodeID(rawID, fromInput: idFromInput)
+      } else {
+        self.issueBlankNode()
+      }
+
+    self.ensureNode(id, activeGraph: activeGraph)
+    if let activeSubject, let activeProperty {
+      try self.addValue(
+        graph: activeGraph,
+        subject: activeSubject,
+        property: activeProperty,
+        value: .object([JSONLDKeyword.id.rawValue: .string(id)]),
+        allowDuplicate: false
+      )
+    }
+    if list != nil {
+      list?.append(.object([JSONLDKeyword.id.rawValue: .string(id)]))
+    }
+
+    if let types = object.removeValue(for: .type), case .array(let typeValues) = types {
+      for typeValue in typeValues {
+        guard case .string(let rawType) = typeValue else { continue }
+        let type = self.normalizeNodeID(rawType, fromInput: true)
+        try self.addValue(
+          graph: activeGraph,
+          subject: id,
+          property: JSONLDKeyword.type.rawValue,
+          value: .string(type),
+          allowDuplicate: false
+        )
+      }
+    }
+
+    if let index = object.removeValue(for: .index) {
+      if let existing = self.nodeMap[activeGraph]?[id]?[.index], existing != index {
+        throw .code(.conflictingIndexes)
+      }
+      self.nodeMap[activeGraph]?[id]?[.index] = index
+    }
+
+    if let reverse = object.removeValue(for: .reverse), case .object(let reverseMap) = reverse {
+      for (property, value) in reverseMap {
+        guard case .array(let values) = value else { continue }
+        for item in values {
+          guard case .object(let reverseNode) = item else { continue }
+          let reverseNodeID =
+            if let rawID = reverseNode[.id]?.stringValue {
+              self.normalizeNodeID(rawID, fromInput: true)
+            } else {
+              self.issueBlankNode()
+            }
+          var reverseNodeWithID = reverseNode
+          reverseNodeWithID[.id] = .string(reverseNodeID)
+
+          var noList: [JSONValue]? = nil
+          try self.generateNodeObject(
+            reverseNodeWithID,
+            activeGraph: activeGraph,
+            activeSubject: nil,
+            activeProperty: nil,
+            list: &noList,
+            idFromInput: false
+          )
+          try self.addValue(
+            graph: activeGraph,
+            subject: reverseNodeID,
+            property: property,
+            value: .object([JSONLDKeyword.id.rawValue: .string(id)]),
+            allowDuplicate: false
+          )
+        }
+      }
+    }
+
+    if let graph = object.removeValue(for: .graph), case .array(let values) = graph {
+      self.ensureGraph(id)
+      for value in values {
+        var noList: [JSONValue]? = nil
+        try self.generate(
+          value,
+          activeGraph: id,
+          activeSubject: nil,
+          activeProperty: nil,
+          list: &noList
+        )
+      }
+    }
+
+    for (property, value) in object {
+      let mappedProperty = self.normalizeProperty(property)
+      self.ensurePropertyArray(graph: activeGraph, subject: id, property: mappedProperty)
+
+      guard case .array(let values) = value else { continue }
+      for item in values {
+        var noList: [JSONValue]? = nil
+        try self.generate(
+          item,
+          activeGraph: activeGraph,
+          activeSubject: id,
+          activeProperty: mappedProperty,
+          list: &noList
+        )
+      }
+    }
+  }
+
+  private mutating func addResult(
+    _ value: JSONValue,
+    activeGraph: String,
+    activeSubject: String?,
+    activeProperty: String?,
+    list: inout [JSONValue]?
+  ) throws(JSONLDError) {
+    if list != nil {
+      list?.append(value)
+      return
+    }
+
+    guard let activeSubject, let activeProperty else { return }
+    let allowDuplicate =
+      if case .object(let object) = value, object[.list] != nil {
+        true
+      } else {
+        false
+      }
+    try self.addValue(
+      graph: activeGraph,
+      subject: activeSubject,
+      property: activeProperty,
+      value: value,
+      allowDuplicate: allowDuplicate
+    )
+  }
+
+  private mutating func addValue(
+    graph: String,
+    subject: String,
+    property: String,
+    value: JSONValue,
+    allowDuplicate: Bool
+  ) throws(JSONLDError) {
+    self.ensurePropertyArray(graph: graph, subject: subject, property: property)
+    guard case .array(var existing) = self.nodeMap[graph]?[subject]?[property] else {
+      throw .internalError(.notObject)
+    }
+
+    if allowDuplicate || !existing.contains(value) {
+      existing.append(value)
+    }
+
+    self.nodeMap[graph]?[subject]?[property] = .array(existing)
+  }
+
+  private func shouldInclude(_ node: JSONObject) -> JSONObject? {
+    if node.count == 1, node[.id] != nil { return nil }
+    return node
+  }
+
+  private mutating func ensureGraph(_ graph: String) {
+    if self.nodeMap[graph] == nil {
+      self.nodeMap[graph] = [:]
+    }
+  }
+
+  private mutating func ensureNode(_ id: String, activeGraph: String) {
+    self.ensureGraph(activeGraph)
+    if self.nodeMap[activeGraph]?[id] == nil {
+      self.nodeMap[activeGraph]?[id] = [JSONLDKeyword.id.rawValue: .string(id)]
+    }
+  }
+
+  private mutating func ensurePropertyArray(graph: String, subject: String, property: String) {
+    self.ensureNode(subject, activeGraph: graph)
+    if self.nodeMap[graph]?[subject]?[property] == nil {
+      self.nodeMap[graph]?[subject]?[property] = .array([])
+    }
+  }
+
+  private mutating func normalizeNodeID(_ id: String, fromInput: Bool) -> String {
+    if id.hasPrefix("_:") {
+      if !fromInput {
+        return id
+      }
+      return self.issueBlankNode(for: id)
+    }
     return id
   }
 
-  private mutating func processValue(_ value: JSONValue, activeGraph: String) -> JSONValue {
-    switch value {
-    case .array(let values):
-      return .array(values.map { self.processValue($0, activeGraph: activeGraph) })
-    case .object(let object):
-      if object[.list] != nil {
-        var list = object
-        if let listValue = object[.list], case .array(let listItems) = listValue {
-          list[.list] = .array(listItems.map { self.processValue($0, activeGraph: activeGraph) })
-        }
-        return .object(list)
-      }
-
-      if object[.value] != nil {
-        return .object(object)
-      }
-
-      let id = self.processNodeObject(object, activeGraph: activeGraph)
-      self.references.insert(id)
-      return .object([JSONLDKeyword.id.rawValue: .string(id)])
-    default:
-      return value
+  private mutating func normalizeProperty(_ property: String) -> String {
+    if property.hasPrefix("_:") {
+      return self.issueBlankNode(for: property)
     }
+    return property
   }
 
-  private mutating func mergeProperty(_ node: inout JSONObject, key: String, value: JSONValue) {
-    if let existing = node[key] {
-      if case .array(var existingArray) = existing {
-        if case .array(let newArray) = value {
-          existingArray.append(contentsOf: newArray)
-        } else {
-          existingArray.append(value)
-        }
-        node[key] = .array(existingArray)
-      } else if case .array(let newArray) = value {
-        node[key] = .array([existing] + newArray)
-      } else {
-        node[key] = .array([existing, value])
-      }
-    } else {
-      node[key] = value
+  private mutating func issueBlankNode(for id: String) -> String {
+    if let mapped = self.blankNodeMap[id] {
+      return mapped
     }
+    let issued = self.issueBlankNode()
+    self.blankNodeMap[id] = issued
+    return issued
   }
 
-  private mutating func nextBlankNodeID() -> String {
+  private mutating func issueBlankNode() -> String {
     defer { self.blankNodeCounter += 1 }
     return "_:b\(self.blankNodeCounter)"
-  }
-
-  private func shouldInclude(node: JSONObject) -> Bool {
-    if node.count == 1, let id = node[.id]?.stringValue, !self.references.contains(id) {
-      return false
-    }
-    return true
   }
 }
 

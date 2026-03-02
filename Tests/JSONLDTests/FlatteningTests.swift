@@ -18,10 +18,13 @@ struct FlatteningTests {
     let context = try testCase.options.contextFilename.map { filename in
       try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
     }
+    let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
+    let documentIRI = manifestBase + testCase.input
+
     let actual = try await processor.flatten(
       input,
       context: context,
-      baseIRI: testCase.options.base,
+      baseIRI: testCase.options.base ?? documentIRI,
       compactArrays: testCase.options.compactArrays
     )
     let expect = try TestCaseLoader.load(
@@ -47,6 +50,8 @@ struct FlatteningTests {
 
     let processor = JSONLDProcessor()
     processor.loader = TestDocumentLoader()
+    let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
+    let documentIRI = manifestBase + testCase.input
 
     await #expect(throws: JSONLDError.code(expectError)) {
       let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
@@ -56,7 +61,7 @@ struct FlatteningTests {
       _ = try await processor.flatten(
         input,
         context: context,
-        baseIRI: testCase.options.base,
+        baseIRI: testCase.options.base ?? documentIRI,
         compactArrays: testCase.options.compactArrays
       )
     }

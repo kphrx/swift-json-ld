@@ -109,13 +109,17 @@ public class JSONLDProcessor {
     baseIRI: String? = nil,
     compactArrays: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Unresolved> {
-    _ = compactArrays
-    // TODO: If context is specified, apply compaction after flattening.
-    _ = context
-
     let expanded = try await self.expandValues(values, baseIRI: baseIRI)
     let expandedDocument = JSONLDDocument<Expanded>(normalizing: expanded, documentURL: baseIRI)
-    return FlatteningAlgorithm.run(expandedDocument)
+    let flattened = try FlatteningAlgorithm.run(expandedDocument)
+    if let context {
+      return try self.compactFlattenedDocument(
+        flattened,
+        with: context,
+        compactArrays: compactArrays
+      )
+    }
+    return flattened
   }
 
   /// Flattens the specified JSON-LD document.
@@ -164,6 +168,91 @@ public class JSONLDProcessor {
       baseIRI: remoteDocument.documentURL,
       normative: normative
     )
+  }
+}
+
+extension JSONLDProcessor {
+  private func compactFlattenedDocument(
+    _ document: JSONLDDocument<Unresolved>,
+    with contextDocument: JSONLDDocument<Unresolved>,
+    compactArrays: Bool
+  ) throws(JSONLDError) -> JSONLDDocument<Unresolved> {
+    let firstContextNode = Array(contextDocument.value).first
+    guard
+      let context = firstContextNode?.context,
+      case .object(let contextObject) = context.jsonValue,
+      case .array(let graphArray) = document.jsonValue
+    else {
+      return document
+    }
+
+    var iriToTerm: [String: String] = [:]
+    for (term, value) in contextObject {
+      if let iri = self.termIRI(from: value) {
+        iriToTerm[iri] = term
+      }
+    }
+
+    let compactedGraph = graphArray.map { item in
+      if case .object(let node) = item {
+        return JSONValue.object(
+          self.compactNode(node, iriToTerm: iriToTerm, compactArrays: compactArrays))
+      }
+      return item
+    }
+
+    let compacted: JSONValue = .object([
+      JSONLDKeyword.context.rawValue: context.jsonValue,
+      JSONLDKeyword.graph.rawValue: .array(compactedGraph),
+    ])
+    return try .init(from: compacted)
+  }
+
+  private func compactNode(
+    _ node: JSONObject,
+    iriToTerm: [String: String],
+    compactArrays: Bool
+  ) -> JSONObject {
+    var result: JSONObject = [:]
+    for (key, value) in node {
+      let compactedKey = iriToTerm[key] ?? key
+      result[compactedKey] = self.compactValue(value, compactArrays: compactArrays)
+    }
+    return result
+  }
+
+  private func compactValue(_ value: JSONValue, compactArrays: Bool) -> JSONValue {
+    switch value {
+    case .array(let array):
+      let compacted = array.map { item in
+        if case .object(let object) = item,
+          object.count == 1,
+          let value = object[JSONLDKeyword.value.rawValue]
+        {
+          return value
+        }
+        return item
+      }
+      if compactArrays, compacted.count == 1 {
+        return compacted[0]
+      }
+      return .array(compacted)
+    default:
+      return value
+    }
+  }
+
+  private func termIRI(from value: JSONValue) -> String? {
+    if case .string(let iri) = value {
+      return iri
+    }
+    if case .object(let object) = value,
+      let id = object[JSONLDKeyword.id.rawValue],
+      case .string(let iri) = id
+    {
+      return iri
+    }
+    return nil
   }
 }
 

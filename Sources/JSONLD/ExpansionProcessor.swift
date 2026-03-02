@@ -666,7 +666,14 @@ enum ExpansionProcessor {
   }
 
   private static func resolveDocumentRelativeIRI(_ value: String, baseIRI: String?) -> String {
-    if let baseIRI,
+    if value.isEmpty {
+      if let baseIRI {
+        return self.normalizeResolvedIRI(baseIRI)
+      }
+      return value
+    }
+    return
+      if let baseIRI,
       let baseURL = URL(string: baseIRI),
       let resolvedURL = URL(string: value, relativeTo: baseURL)
     {
