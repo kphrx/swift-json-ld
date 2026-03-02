@@ -6,13 +6,10 @@ import Foundation
 /// A processor for JSON-LD documents.
 ///
 /// This class handles operations like expansion, compaction, and flattening.
-/// It maintains configuration settings like the document loader and logger.
+/// It maintains configuration settings like the document loader.
 public class JSONLDProcessor {
   /// The loader used to resolve remote documents and contexts.
   public var loader: any JSONLDDocumentLoader = DefaultLoader()
-
-  /// An optional logger for capturing internal events.
-  public var logger: (any JSONLDLogger)?
 
   public init() {}
 
@@ -50,7 +47,7 @@ public class JSONLDProcessor {
     if let expandContext {
       for contexts in expandContext.value.compactMap(\.context) {
         activeContext = try await activeContext.process(
-          localContext: contexts, loader: self.loader, logger: self.logger)
+          localContext: contexts, loader: self.loader)
       }
     }
 
@@ -58,8 +55,7 @@ public class JSONLDProcessor {
       activeContext,
       value: values.value,
       property: nil,
-      loader: self.loader,
-      logger: self.logger
+      loader: self.loader
     )
 
     var nodes: [NodeObject<Expanded>] = []
@@ -144,8 +140,9 @@ public class JSONLDProcessor {
       case .success(let doc):
         doc
       case .failure(let error):
-        self.logger?.log("Failed to load remote document from \(url): \(error)", level: .error)
-        throw .code(.loadingRemoteContextFailed)
+        throw .code(
+          .loadingRemoteContextFailed,
+          debugInfo: .init(url: url, message: String(describing: error)))
       }
 
     let document = try JSONLDDocument<Unresolved>(from: remoteDocument.document)
@@ -161,6 +158,9 @@ public class JSONLDProcessor {
 private struct DefaultLoader: JSONLDDocumentLoader {
   func load(url: String) async -> Result<RemoteDocument, any Error> {
     // TODO: Implementation of a default loader using URLSession or AsyncHTTPClient.
-    .failure(JSONLDError.code(.loadingRemoteContextFailed))
+    .failure(
+      JSONLDError.code(
+        .loadingRemoteContextFailed,
+        debugInfo: .init(url: url, message: "default loader is not implemented")))
   }
 }

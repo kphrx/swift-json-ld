@@ -42,8 +42,7 @@ struct ActiveContext: Equatable, Sendable {
   func process(
     localContext: Contexts,
     remoteContexts: [String] = [],
-    loader: (any JSONLDDocumentLoader)? = nil,
-    logger: (any JSONLDLogger)? = nil
+    loader: (any JSONLDDocumentLoader)? = nil
   ) async throws(JSONLDError) -> ActiveContext {
     var result = self
 
@@ -52,11 +51,11 @@ struct ActiveContext: Equatable, Sendable {
       return .init(baseIRI: self.originalBaseIRI, originalBaseIRI: self.originalBaseIRI)
     case .single(let context):
       try await result.process(
-        context: context, remoteContexts: remoteContexts, loader: loader, logger: logger)
+        context: context, remoteContexts: remoteContexts, loader: loader)
     case .array(let contexts):
       for context in contexts {
         try await result.process(
-          context: context, remoteContexts: remoteContexts, loader: loader, logger: logger)
+          context: context, remoteContexts: remoteContexts, loader: loader)
       }
     }
 
@@ -66,8 +65,7 @@ struct ActiveContext: Equatable, Sendable {
   private mutating func process(
     context: Context,
     remoteContexts: [String],
-    loader: (any JSONLDDocumentLoader)?,
-    logger: (any JSONLDLogger)?
+    loader: (any JSONLDDocumentLoader)?
   ) async throws(JSONLDError) {
     switch context {
     case .absoluteIRI(let iri), .relativeIRI(let iri):
@@ -77,14 +75,19 @@ struct ActiveContext: Equatable, Sendable {
         throw .code(.recursiveContextInclusion)
       }
       if remoteContexts.count >= Self.maxRemoteContexts {
-        throw .code(.loadingRemoteContextFailed)
+        // TODO: Add processingMode and throw `.code(.contextOverflow)` in json-ld-1.1 mode.
+        throw .internalError(
+          .implementationLimitExceeded,
+          debugInfo: .init(url: resolvedIRI))
       }
 
       var updatedRemoteContexts = remoteContexts
       updatedRemoteContexts.append(resolvedIRI)
 
       guard let loader else {
-        throw .code(.loadingRemoteContextFailed)
+        throw .code(
+          .loadingRemoteContextFailed,
+          debugInfo: .init(url: resolvedIRI, message: "document loader is not configured"))
       }
 
       let result = await loader.load(url: resolvedIRI)
@@ -93,9 +96,9 @@ struct ActiveContext: Equatable, Sendable {
         case .success(let doc):
           doc
         case .failure(let error):
-          logger?.log(
-            "Failed to load remote context from \(resolvedIRI): \(error)", level: .error)
-          throw .code(.loadingRemoteContextFailed)
+          throw .code(
+            .loadingRemoteContextFailed,
+            debugInfo: .init(url: resolvedIRI, message: String(describing: error)))
         }
 
       guard case .object(let obj) = remoteDocument.document,
@@ -112,8 +115,7 @@ struct ActiveContext: Equatable, Sendable {
       self = try await subContext.process(
         localContext: remoteContext,
         remoteContexts: updatedRemoteContexts,
-        loader: loader,
-        logger: logger
+        loader: loader
       )
 
     case .contextDefinition(let definition):

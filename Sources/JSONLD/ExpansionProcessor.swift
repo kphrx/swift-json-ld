@@ -9,15 +9,13 @@ enum ExpansionProcessor {
     value: SingleOrMany<JSONLDValue<Unresolved>>,
     property: String?,
     insideList: Bool = false,
-    loader: (any JSONLDDocumentLoader)? = nil,
-    logger: (any JSONLDLogger)? = nil
+    loader: (any JSONLDDocumentLoader)? = nil
   ) async throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     var result: [JSONLDValue<Expanded>] = []
     for item in value {
       guard
         let expanded = try await self.expand(
-          activeContext, value: item, property: property, insideList: insideList, loader: loader,
-          logger: logger)
+          activeContext, value: item, property: property, insideList: insideList, loader: loader)
       else {
         continue
       }
@@ -36,14 +34,12 @@ enum ExpansionProcessor {
     value: JSONLDValue<Unresolved>,
     property: String?,
     insideList: Bool = false,
-    loader: (any JSONLDDocumentLoader)? = nil,
-    logger: (any JSONLDLogger)? = nil
+    loader: (any JSONLDDocumentLoader)? = nil
   ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
     switch value {
     case .unknown(let content):
       return try await self.expandObject(
-        activeContext, object: content, property: property, insideList: insideList, loader: loader,
-        logger: logger)
+        activeContext, object: content, property: property, insideList: insideList, loader: loader)
 
     case .invalid(let invalid):
       switch invalid {
@@ -130,7 +126,7 @@ enum ExpansionProcessor {
       var activeContext = activeContext
       if let localContext = nodeObject.context {
         activeContext = try await activeContext.process(
-          localContext: localContext, loader: loader, logger: logger)
+          localContext: localContext, loader: loader)
       }
 
       var combinedProperties = nodeObject.properties
@@ -150,15 +146,14 @@ enum ExpansionProcessor {
 
       return try await self.expandObject(
         activeContext, object: combinedProperties, property: property, insideList: insideList,
-        loader: loader, logger: logger)
+        loader: loader)
 
     case .value(let valueObject):
       let object = try valueObject.jsonObject.mapValuesWithTypedThrows(
         SingleOrMany<JSONLDValue<Unresolved>>.init(from:)
       )
       return try await self.expandObject(
-        activeContext, object: object, property: property, insideList: insideList, loader: loader,
-        logger: logger)
+        activeContext, object: object, property: property, insideList: insideList, loader: loader)
 
     case .setOrList(let setOrListObject):
       switch setOrListObject {
@@ -166,7 +161,7 @@ enum ExpansionProcessor {
         let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
         let expanded = try await self.expand(
           activeContext, value: .many(unresolvedItems), property: property, insideList: insideList,
-          loader: loader, logger: logger)
+          loader: loader)
         return try .setOrList(
           .set(.many(expanded.map { .init($0) }), context: nil, index: nil))
       case .list(let values, _, _):
@@ -174,7 +169,7 @@ enum ExpansionProcessor {
         let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
         let expanded = try await self.expand(
           activeContext, value: .many(unresolvedItems), property: property, insideList: true,
-          loader: loader, logger: logger)
+          loader: loader)
 
         for item in expanded {
           if case .setOrList(.list) = item {
@@ -206,7 +201,7 @@ enum ExpansionProcessor {
         let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
         let expanded = try await self.expand(
           activeContext, value: .many(unresolvedItems), property: property, insideList: insideList,
-          loader: loader, logger: logger)
+          loader: loader)
         expandedItems.append(contentsOf: expanded)
       }
       return .setOrList(
@@ -219,15 +214,14 @@ enum ExpansionProcessor {
     object: [String: SingleOrMany<JSONLDValue<Unresolved>>],
     property: String?,
     insideList: Bool,
-    loader: (any JSONLDDocumentLoader)? = nil,
-    logger: (any JSONLDLogger)? = nil
+    loader: (any JSONLDDocumentLoader)? = nil
   ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
     var object = object
     var activeContext = activeContext
 
     if let localContextValue = object.removeValue(forKey: JSONLDKeyword.context.rawValue) {
       activeContext = try await activeContext.process(
-        localContext: try .init(from: localContextValue.jsonValue), loader: loader, logger: logger)
+        localContext: try .init(from: localContextValue.jsonValue), loader: loader)
     }
 
     var expandedProperties: JSONObject = [:]
@@ -277,8 +271,7 @@ enum ExpansionProcessor {
       case .list?:
         if insideList { throw .code(.listOfLists) }
         let expandedList = try await self.expand(
-          activeContext, value: val, property: property, insideList: true, loader: loader,
-          logger: logger)
+          activeContext, value: val, property: property, insideList: true, loader: loader)
 
         for item in expandedList {
           if case .setOrList(.list) = item {
@@ -289,14 +282,12 @@ enum ExpansionProcessor {
 
       case .set?:
         let expandedSet = try await self.expand(
-          activeContext, value: val, property: property, insideList: insideList, loader: loader,
-          logger: logger)
+          activeContext, value: val, property: property, insideList: insideList, loader: loader)
         expandedProperties[expandedProperty] = .array(expandedSet.map(\.jsonValue))
 
       case .graph?:
         let expandedGraph = try await self.expand(
-          activeContext, value: val, property: "@graph", insideList: false, loader: loader,
-          logger: logger)
+          activeContext, value: val, property: "@graph", insideList: false, loader: loader)
         expandedProperties[expandedProperty] = .array(expandedGraph.map(\.jsonValue))
 
       case .index?:
@@ -316,8 +307,7 @@ enum ExpansionProcessor {
 
         if let expandedReverse = try await self.expandObject(
           activeContext, object: reverseObject, property: "@reverse", insideList: false,
-          loader: loader,
-          logger: logger),
+          loader: loader),
           case .node(let node) = expandedReverse
         {
           for (reverseKey, reverseValue) in node.jsonObject {
@@ -430,8 +420,7 @@ enum ExpansionProcessor {
           var values: [JSONLDValue<Expanded>] = []
           for (index, indexVal) in map.sorted(by: { $0.key < $1.key }) {
             let expanded = try await self.expand(
-              activeContext, value: indexVal, property: key, insideList: insideList, loader: loader,
-              logger: logger)
+              activeContext, value: indexVal, property: key, insideList: insideList, loader: loader)
 
             for item in expanded {
               if case .object(var object) = item.jsonValue {
@@ -448,7 +437,7 @@ enum ExpansionProcessor {
         } else {
           expandedValues = try await self.expand(
             activeContext, value: val, property: key, insideList: insideList,
-            loader: loader, logger: logger)
+            loader: loader)
         }
 
         let shouldIncludeProperty =

@@ -1,9 +1,11 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public enum JSONLDError: Error, Equatable {
-  case code(Code)
-  case internalError(Internal)
+public struct JSONLDError: Error, Equatable, Sendable {
+  public enum Kind: Equatable, Sendable {
+    case code(Code)
+    case internalError(Internal)
+  }
 
   public enum Code: String, Equatable, Sendable {
     // JSON-LD 1.0 Processing Algorithms and API § 11.4 Error Handling § JsonLdErrorCode
@@ -59,12 +61,45 @@ public enum JSONLDError: Error, Equatable {
     case notValueObject
     case notSetOrListObject
     case notKeyword
+    case implementationLimitExceeded
+  }
+
+  public struct DebugInfo: Equatable, Sendable {
+    public let url: String?
+    public let message: String?
+
+    public init(url: String? = nil, message: String? = nil) {
+      self.url = url
+      self.message = message
+    }
+  }
+
+  public let kind: Kind
+  public let debugInfo: DebugInfo?
+
+  public init(kind: Kind, debugInfo: DebugInfo? = nil) {
+    self.kind = kind
+    self.debugInfo = debugInfo
+  }
+
+  public static func code(_ code: Code, debugInfo: DebugInfo? = nil) -> Self {
+    .init(kind: .code(code), debugInfo: debugInfo)
+  }
+
+  public static func internalError(_ internalError: Internal, debugInfo: DebugInfo? = nil) -> Self {
+    .init(kind: .internalError(internalError), debugInfo: debugInfo)
+  }
+}
+
+extension JSONLDError {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.kind == rhs.kind
   }
 }
 
 extension JSONLDError: CustomStringConvertible {
   public var description: String {
-    switch self {
+    switch self.kind {
     case .code(let code): code.rawValue
     case .internalError(let internalError):
       switch internalError {
@@ -73,6 +108,7 @@ extension JSONLDError: CustomStringConvertible {
       case .notValueObject: "not a value object"
       case .notSetOrListObject: "not a set or list object"
       case .notKeyword: "not a keyword"
+      case .implementationLimitExceeded: "implementation limit exceeded"
       }
     }
   }

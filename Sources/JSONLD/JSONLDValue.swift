@@ -62,7 +62,7 @@ public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
       } else if jsonObject.contains(.list) || jsonObject.contains(.set) {
         do {
           self = .setOrList(try .init(from: jsonObject))
-        } catch .code(.listOfLists) {
+        } catch let error where error.kind == .code(.listOfLists) {
           self = .invalid(.listOfLists)
         }
       } else if !jsonObject.keys.contains(where: { $0.hasPrefix("@") })
