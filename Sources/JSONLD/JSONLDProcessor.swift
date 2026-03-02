@@ -64,6 +64,39 @@ public class JSONLDProcessor {
   }
 
   /// Compacts the specified JSON-LD document.
+  public func compact(
+    _ document: JSONLDDocument<Unresolved>,
+    context: JSONLDDocument<Unresolved>,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true,
+    compactToRelative: Bool = true
+  ) throws(JSONLDError) -> JSONLDDocument<Unresolved> {
+    try self.compact(
+      document.values,
+      context: context,
+      baseIRI: baseIRI ?? document.documentURL,
+      compactArrays: compactArrays,
+      compactToRelative: compactToRelative
+    )
+  }
+
+  /// Compacts a collection of JSON-LD values.
+  public func compact(
+    _ values: JSONLDValues<Unresolved>,
+    context: JSONLDDocument<Unresolved>,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true,
+    compactToRelative: Bool = true
+  ) throws(JSONLDError) -> JSONLDDocument<Unresolved> {
+    let algorithm = try CompactionAlgorithm(
+      context: context,
+      options: .init(
+        baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
+    )
+    return try algorithm.compact(values)
+  }
+
+  /// Compacts the specified JSON-LD document.
   public func compact<P: JSONLDPhase>(
     _ document: JSONLDDocument<P>,
     context: JSONLDDocument<Unresolved>,
