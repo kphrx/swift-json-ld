@@ -20,11 +20,8 @@ public class JSONLDProcessor {
     baseIRI: String? = nil,
     normative: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
-    let unresolvedValues = document.value.map(JSONLDValue<Unresolved>.node)
-
-    let values = JSONLDValues<Unresolved>(.many(unresolvedValues))
     return try await self.expand(
-      values,
+      document.values,
       expandContext: expandContext,
       baseIRI: baseIRI ?? document.documentURL,
       normative: normative
@@ -38,48 +35,32 @@ public class JSONLDProcessor {
     baseIRI: String? = nil,
     normative: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
-    var activeContext = ActiveContext.empty
-    if let baseIRI {
-      activeContext.baseIRI = baseIRI
-      activeContext.originalBaseIRI = baseIRI
-    }
-
-    if let expandContext {
-      for contexts in expandContext.value.compactMap(\.context) {
-        activeContext = try await activeContext.process(
-          localContext: contexts, loader: self.loader)
-      }
-    }
-
-    let expanded = try await ExpansionProcessor.expand(
-      activeContext,
-      value: values.value,
-      property: nil,
-      loader: self.loader
+    let expandedValues = try await self.expandValues(
+      values,
+      expandContext: expandContext,
+      baseIRI: baseIRI,
+      normative: normative
     )
 
-    var nodes: [NodeObject<Expanded>] = []
-    for item in expanded {
-      guard case .node(let node) = item else { continue }
+    return .init(normalizing: expandedValues, documentURL: baseIRI)
+  }
 
-      if let graph = node.graph,
-        node.context == nil,
-        node.id == nil,
-        node.type == nil,
-        node.reverse == nil,
-        node.index == nil,
-        node.properties.isEmpty
-      {
-        nodes.append(
-          contentsOf: graph.compactMap {
-            if case .node(let node) = $0 { node } else { nil }
-          })
-      } else {
-        nodes.append(node)
-      }
-    }
-
-    return JSONLDDocument<Expanded>(.init(nodes), documentURL: baseIRI)
+  /// Expands a collection of JSON-LD values and returns expanded values without document normalization.
+  public func expandValues(
+    _ values: JSONLDValues<Unresolved>,
+    expandContext: JSONLDDocument<Unresolved>? = nil,
+    baseIRI: String? = nil,
+    normative: Bool = true
+  ) async throws(JSONLDError) -> JSONLDValues<Expanded> {
+    try await ExpansionAlgorithm.run(
+      .init(
+        values: values,
+        expandContext: expandContext,
+        baseIRI: baseIRI,
+        normative: normative
+      ),
+      loader: self.loader
+    )
   }
 
   /// Compacts the specified JSON-LD document.

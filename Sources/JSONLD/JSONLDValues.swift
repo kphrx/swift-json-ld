@@ -27,3 +27,28 @@ extension JSONLDValues: Decodable where P == Unresolved {
     try self.init(from: jsonValue)
   }
 }
+
+extension JSONLDValues where P == Expanded {
+  public func asDocument(documentURL: String? = nil) -> JSONLDDocument<Expanded> {
+    let nodes = self.value.compactMap { value -> [NodeObject<Expanded>]? in
+      guard case .node(let node) = value else { return nil }
+
+      if let graph = node.graph,
+        node.context == nil,
+        node.id == nil,
+        node.type == nil,
+        node.reverse == nil,
+        node.index == nil,
+        node.properties.isEmpty
+      {
+        return graph.compactMap {
+          if case .node(let node) = $0 { node } else { nil }
+        }
+      }
+
+      return [node]
+    }.flatMap { $0 }
+
+    return .init(.many(nodes), documentURL: documentURL)
+  }
+}

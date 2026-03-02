@@ -25,6 +25,10 @@ public struct JSONLDDocument<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self.init(try .init(from: jsonValue))
   }
+
+  public var values: JSONLDValues<P> {
+    .init(.many(self.value.map(JSONLDValue<P>.node)))
+  }
 }
 
 extension JSONLDDocument: Decodable where P == Unresolved {
@@ -35,5 +39,11 @@ extension JSONLDDocument: Decodable where P == Unresolved {
   public init(from decoder: Decoder) throws {
     let jsonValue = try JSONValue(from: decoder)
     try self.init(from: jsonValue)
+  }
+}
+
+extension JSONLDDocument where P == Expanded {
+  public init(normalizing values: JSONLDValues<Expanded>, documentURL: String? = nil) {
+    self = values.asDocument(documentURL: documentURL)
   }
 }
