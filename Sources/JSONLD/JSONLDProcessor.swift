@@ -88,6 +88,37 @@ public class JSONLDProcessor {
   }
 
   /// Flattens the specified JSON-LD document.
+  public func flatten(
+    _ document: JSONLDDocument<Unresolved>,
+    context: JSONLDDocument<Unresolved>? = nil,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true
+  ) async throws(JSONLDError) -> JSONLDDocument<Unresolved> {
+    try await self.flatten(
+      document.values,
+      context: context,
+      baseIRI: baseIRI ?? document.documentURL,
+      compactArrays: compactArrays
+    )
+  }
+
+  /// Flattens a collection of JSON-LD values.
+  public func flatten(
+    _ values: JSONLDValues<Unresolved>,
+    context: JSONLDDocument<Unresolved>? = nil,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true
+  ) async throws(JSONLDError) -> JSONLDDocument<Unresolved> {
+    _ = compactArrays
+    // TODO: If context is specified, apply compaction after flattening.
+    _ = context
+
+    let expanded = try await self.expandValues(values, baseIRI: baseIRI)
+    let expandedDocument = JSONLDDocument<Expanded>(normalizing: expanded, documentURL: baseIRI)
+    return FlatteningAlgorithm.run(expandedDocument)
+  }
+
+  /// Flattens the specified JSON-LD document.
   public func flatten<P: JSONLDPhase>(
     _ document: JSONLDDocument<P>,
     context: JSONLDDocument<Unresolved>? = nil,

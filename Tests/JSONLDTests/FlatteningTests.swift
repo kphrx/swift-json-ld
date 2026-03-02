@@ -11,14 +11,14 @@ struct FlatteningTests {
   @Test(
     "[Flattening] Positive Evaluation Test with processingMode 1.0",
     arguments: TestCaseLoader.flatteningTestsPositiveCases(version: .v1p0))
-  func positiveEvaluationTestOneZero(testCase: FlattenTest.PositiveCase) throws {
+  func positiveEvaluationTestOneZero(testCase: FlattenTest.PositiveCase) async throws {
     let processor = JSONLDProcessor()
     processor.loader = TestDocumentLoader()
     let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
     let context = try testCase.options.contextFilename.map { filename in
       try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
     }
-    let actual = try processor.flatten(
+    let actual = try await processor.flatten(
       input,
       context: context,
       baseIRI: testCase.options.base,
@@ -38,7 +38,7 @@ struct FlatteningTests {
   @Test(
     "[Flattening] Negative Evaluation Test with processingMode 1.0",
     arguments: TestCaseLoader.flatteningTestsNegativeCases(version: .v1p0))
-  func negativeEvaluationTestOneZero(testCase: FlattenTest.NegativeCase) throws {
+  func negativeEvaluationTestOneZero(testCase: FlattenTest.NegativeCase) async throws {
     guard let expectError = JSONLDError.Code(rawValue: testCase.expectErrorCode) else {
       Issue.record(
         "Missing JSONLDError case for expected error code: '\(testCase.expectErrorCode)'")
@@ -48,12 +48,12 @@ struct FlatteningTests {
     let processor = JSONLDProcessor()
     processor.loader = TestDocumentLoader()
 
-    #expect(throws: JSONLDError.code(expectError)) {
+    await #expect(throws: JSONLDError.code(expectError)) {
       let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
       let context = try testCase.options.contextFilename.map { filename in
         try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
       }
-      _ = try processor.flatten(
+      _ = try await processor.flatten(
         input,
         context: context,
         baseIRI: testCase.options.base,
