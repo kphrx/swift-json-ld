@@ -77,14 +77,14 @@ extension Bool: LosslessJSONValueConvertible {
   }
 }
 
-extension CustomJSONArrayConvertible {
+extension CustomJSONValueConvertible where Self: CustomJSONArrayConvertible {
   /// Wraps ``jsonArray`` as `.array`.
   public var jsonValue: JSONValue {
     .array(self.jsonArray)
   }
 }
 
-extension CustomJSONObjectConvertible {
+extension CustomJSONValueConvertible where Self: CustomJSONObjectConvertible {
   /// Wraps ``jsonObject`` as `.object`.
   public var jsonValue: JSONValue {
     .object(self.jsonObject)
