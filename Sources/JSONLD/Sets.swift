@@ -61,6 +61,10 @@ public enum SetOrListObject<P: JSONLDPhase>: JSONLDObjectProtocol, JSONLDValuePr
     }
   }
 
+  var setOrListValues: SingleOrMany<SetValue<P>> {
+    self.values
+  }
+
   private var context: Contexts? {
     switch self {
     case .set(_, let context, _), .list(_, let context, _):

@@ -70,8 +70,8 @@ public class JSONLDProcessor {
     baseIRI: String? = nil,
     compactArrays: Bool = true,
     compactToRelative: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument<Unresolved> {
-    try self.compact(
+  ) async throws(JSONLDError) -> JSONLDDocument<Unresolved> {
+    try await self.compact(
       document.values,
       context: context,
       baseIRI: baseIRI ?? document.documentURL,
@@ -87,13 +87,16 @@ public class JSONLDProcessor {
     baseIRI: String? = nil,
     compactArrays: Bool = true,
     compactToRelative: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument<Unresolved> {
+  ) async throws(JSONLDError) -> JSONLDDocument<Unresolved> {
+    try CompactionAlgorithm.validateInvalidCompactionInputs(values)
+    let expanded = try await self.expandValues(values, baseIRI: baseIRI)
+    let normalizedInput = try JSONLDValues<Unresolved>(from: expanded.jsonValue)
     let algorithm = try CompactionAlgorithm(
       context: context,
       options: .init(
         baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
     )
-    return try algorithm.compact(values)
+    return try algorithm.compact(normalizedInput)
   }
 
   /// Compacts the specified JSON-LD document.

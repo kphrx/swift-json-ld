@@ -157,14 +157,14 @@ enum ExpansionProcessor {
 
     case .setOrList(let setOrListObject):
       switch setOrListObject {
-      case .set(let values, _, _):
+      case .set(let values, _, let index):
         let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
         let expanded = try await self.expand(
           activeContext, value: .many(unresolvedItems), property: property, insideList: insideList,
           loader: loader)
         return try .setOrList(
-          .set(.many(expanded.map { .init($0) }), context: nil, index: nil))
-      case .list(let values, _, _):
+          .set(.many(expanded.map { .init($0) }), context: nil, index: index))
+      case .list(let values, _, let index):
         if insideList { throw .code(.listOfLists) }
         let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
         let expanded = try await self.expand(
@@ -178,7 +178,7 @@ enum ExpansionProcessor {
         }
 
         return try .setOrList(
-          .list(.many(expanded.map { .init($0) }), context: nil, index: nil))
+          .list(.many(expanded.map { .init($0) }), context: nil, index: index))
       }
 
     case .languageMap(let languageMap):
