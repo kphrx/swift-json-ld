@@ -126,7 +126,7 @@ enum ExpansionProcessor {
       var activeContext = activeContext
       if let localContext = nodeObject.context {
         activeContext = try await activeContext.process(
-          localContext: localContext, loader: loader)
+          contexts: localContext, loader: loader)
       }
 
       var combinedProperties = nodeObject.properties
@@ -221,7 +221,7 @@ enum ExpansionProcessor {
 
     if let localContextValue = object.removeValue(forKey: JSONLDKeyword.context.rawValue) {
       activeContext = try await activeContext.process(
-        localContext: try .init(from: localContextValue.jsonValue), loader: loader)
+        contexts: try .init(from: localContextValue.jsonValue), loader: loader)
     }
 
     var expandedProperties: JSONObject = [:]

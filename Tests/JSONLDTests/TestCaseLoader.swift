@@ -3,6 +3,8 @@
 
 import Foundation
 
+@testable import JSONLD
+
 enum TestCaseLoader {
   enum JsonLdVersion: String, Decodable {
     case v1p0 = "json-ld-1.0"
@@ -81,6 +83,17 @@ enum TestCaseLoader {
 
   static func load<T: Decodable>(_ name: String, type: T.Type = T.self) throws -> T {
     try Util.loadFixture(name, from: self.testCasePath, type: type)
+  }
+
+  static func loadContexts(_ name: String?) throws -> Contexts? {
+    guard let name else { return nil }
+    let jsonValue: JSONValue = try self.load(name, type: JSONValue.self)
+    if case .object(let object) = jsonValue,
+      let localContext = object[.context]
+    {
+      return try Contexts(from: localContext)
+    }
+    return nil
   }
 
   static func expansionTestsPositiveCases(version: JsonLdVersion) -> [ExpandTest.PositiveCase] {

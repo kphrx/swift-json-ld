@@ -30,17 +30,17 @@ struct CompactionAlgorithm {
   private let baseIRI: String?
   private let defaultLanguage: String?
 
-  init(context: JSONLDDocument<Unresolved>, options: Options) throws(JSONLDError) {
+  init(activeContext: ActiveContext, contextValue: JSONValue, options: Options) {
     self.options = options
-    let firstNode = Array(context.value).first
-    self.contextValue = firstNode?.context?.jsonValue ?? .object([:])
+    self.contextValue = contextValue
     let contextObject = Self.mergedContextObject(from: self.contextValue)
     self.baseIRI = Self.stringValue(contextObject[JSONLDKeyword.base.rawValue]) ?? options.baseIRI
     self.vocabMapping = Self.resolveVocabMapping(contextObject, baseIRI: self.baseIRI)
     self.defaultLanguage = Self.stringValue(contextObject[JSONLDKeyword.language.rawValue])?
       .lowercased()
 
-    let termDefs = try Self.parseTermDefinitions(contextObject)
+    let simpleTerms = Self.simpleTerms(from: contextObject)
+    let termDefs = Self.termDefinitions(from: activeContext, simpleTerms: simpleTerms)
     self.termDefs = Dictionary(uniqueKeysWithValues: termDefs.map { ($0.term, $0) })
 
     var iriMap: [String: [TermDef]] = [:]
@@ -53,6 +53,32 @@ struct CompactionAlgorithm {
     }
     self.iriToTerms = iriMap
     self.keywordAliases = keywordAliases
+  }
+
+  private static func termDefinitions(from activeContext: ActiveContext, simpleTerms: Set<String>)
+    -> [TermDef]
+  {
+    activeContext.termDefinitions.map { term, definition in
+      .init(
+        term: term,
+        iri: definition.iri,
+        type: definition.typeMapping,
+        language: definition.languageMapping,
+        languageDefined: definition.languageMappingDefined,
+        container: definition.containerMapping.keyword?.rawValue,
+        reverse: definition.reverse,
+        isSimpleTerm: simpleTerms.contains(term)
+      )
+    }
+  }
+
+  private static func simpleTerms(from context: JSONObject) -> Set<String> {
+    Set(
+      context.compactMap { key, value in
+        if key.hasPrefix("@") { return nil }
+        if case .string = value { return key }
+        return nil
+      })
   }
 
   func compact<P: JSONLDPhase>(_ values: JSONLDValues<P>) throws(JSONLDError)

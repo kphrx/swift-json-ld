@@ -27,6 +27,13 @@ public enum Contexts: JSONLDValueProtocol, Equatable, Sendable {
   }
 }
 
+extension Contexts: Decodable {
+  public init(from decoder: Decoder) throws {
+    let jsonValue = try JSONValue(from: decoder)
+    try self.init(from: jsonValue)
+  }
+}
+
 public enum Context: JSONLDValueProtocol, Equatable, Sendable {
   case absoluteIRI(String)
   case relativeIRI(String)

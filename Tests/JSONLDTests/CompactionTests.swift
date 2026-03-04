@@ -15,8 +15,10 @@ struct CompactionTests {
     let processor = JSONLDProcessor()
     processor.loader = TestDocumentLoader()
     let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
-    let context = try TestCaseLoader.load(
-      testCase.options.contextFilename, type: JSONLDDocument<Unresolved>.self)
+    guard let context = try TestCaseLoader.loadContexts(testCase.options.contextFilename) else {
+      Issue.record("Failed to load local context from \(testCase.options.contextFilename)")
+      return
+    }
     let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
     let documentIRI = manifestBase + testCase.input
 
@@ -56,8 +58,9 @@ struct CompactionTests {
 
     await #expect(throws: JSONLDError.code(expectError)) {
       let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
-      let context = try TestCaseLoader.load(
-        testCase.options.contextFilename, type: JSONLDDocument<Unresolved>.self)
+      guard let context = try TestCaseLoader.loadContexts(testCase.options.contextFilename) else {
+        throw JSONLDError.internalError(.notObject)
+      }
       _ = try await processor.compact(
         input,
         context: context,

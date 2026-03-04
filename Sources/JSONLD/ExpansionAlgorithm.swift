@@ -6,7 +6,7 @@ import Foundation
 struct ExpansionAlgorithm {
   struct Input {
     let values: JSONLDValues<Unresolved>
-    let expandContext: JSONLDDocument<Unresolved>?
+    let expandContext: Contexts?
     let baseIRI: String?
     let normative: Bool
   }
@@ -24,9 +24,7 @@ struct ExpansionAlgorithm {
     }
 
     if let expandContext = input.expandContext {
-      for contexts in expandContext.value.compactMap(\.context) {
-        activeContext = try await activeContext.process(localContext: contexts, loader: loader)
-      }
+      activeContext = try await activeContext.process(contexts: expandContext, loader: loader)
     }
 
     let expanded = try await ExpansionProcessor.expand(

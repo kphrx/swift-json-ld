@@ -16,10 +16,7 @@ struct ExpansionTests {
     processor.loader = TestDocumentLoader()
 
     let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
-    let expandContext = try testCase.options.expandContextFilename.map { filename in
-      try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
-    }
-
+    let expandContext = try TestCaseLoader.loadContexts(testCase.options.expandContextFilename)
     // JSON-LD Test Suite base URL
     let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
     let documentIRI = manifestBase + testCase.input
@@ -61,9 +58,7 @@ struct ExpansionTests {
 
     await #expect(throws: JSONLDError.code(expectError)) {
       let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
-      let expandContext = try testCase.options.expandContextFilename.map { filename in
-        try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
-      }
+      let expandContext = try TestCaseLoader.loadContexts(testCase.options.expandContextFilename)
       _ = try await processor.expand(
         input,
         expandContext: expandContext,

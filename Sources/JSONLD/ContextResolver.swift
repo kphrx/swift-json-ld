@@ -3,15 +3,27 @@
 
 struct ContextResolver {
   let loader: (any JSONLDDocumentLoader)?
+  let allowEmptyVocabMapping: Bool
+  let allowRelativeVocabMapping: Bool
+
+  init(
+    loader: (any JSONLDDocumentLoader)?,
+    allowEmptyVocabMapping: Bool = false,
+    allowRelativeVocabMapping: Bool = false
+  ) {
+    self.loader = loader
+    self.allowEmptyVocabMapping = allowEmptyVocabMapping
+    self.allowRelativeVocabMapping = allowRelativeVocabMapping
+  }
 
   func process(
-    localContext: Contexts,
+    contexts: Contexts,
     activeContext: ActiveContext,
     remoteContexts: [String] = []
   ) async throws(JSONLDError) -> ActiveContext {
     var result = activeContext
 
-    switch localContext {
+    switch contexts {
     case .null:
       return .init(
         baseIRI: activeContext.originalBaseIRI, originalBaseIRI: activeContext.originalBaseIRI)
@@ -79,7 +91,7 @@ struct ContextResolver {
       subContext.baseIRI = remoteDocument.documentURL
 
       activeContext = try await self.process(
-        localContext: remoteContext,
+        contexts: remoteContext,
         activeContext: subContext,
         remoteContexts: updatedRemoteContexts
       )
@@ -93,7 +105,11 @@ struct ContextResolver {
     throws(JSONLDError)
   {
     try activeContext.applyBaseIRI(contextDefinition.baseIRI)
-    try activeContext.applyVocabMapping(contextDefinition.vocabMapping)
+    try activeContext.applyVocabMapping(
+      contextDefinition.vocabMapping,
+      allowEmptyMapping: self.allowEmptyVocabMapping,
+      allowRelativeMapping: self.allowRelativeVocabMapping
+    )
     activeContext.applyDefaultLanguage(contextDefinition.defaultLanguage)
     try activeContext.applyTerms(from: contextDefinition)
   }

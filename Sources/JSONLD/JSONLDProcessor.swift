@@ -16,7 +16,7 @@ public class JSONLDProcessor {
   /// Expands the specified JSON-LD document.
   public func expand(
     _ document: JSONLDDocument<Unresolved>,
-    expandContext: JSONLDDocument<Unresolved>? = nil,
+    expandContext: Contexts? = nil,
     baseIRI: String? = nil,
     normative: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
@@ -31,7 +31,7 @@ public class JSONLDProcessor {
   /// Expands a collection of JSON-LD values.
   public func expand(
     _ values: JSONLDValues<Unresolved>,
-    expandContext: JSONLDDocument<Unresolved>? = nil,
+    expandContext: Contexts? = nil,
     baseIRI: String? = nil,
     normative: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
@@ -48,7 +48,7 @@ public class JSONLDProcessor {
   /// Expands a collection of JSON-LD values and returns expanded values without document normalization.
   public func expandValues(
     _ values: JSONLDValues<Unresolved>,
-    expandContext: JSONLDDocument<Unresolved>? = nil,
+    expandContext: Contexts? = nil,
     baseIRI: String? = nil,
     normative: Bool = true
   ) async throws(JSONLDError) -> JSONLDValues<Expanded> {
@@ -66,7 +66,7 @@ public class JSONLDProcessor {
   /// Compacts the specified JSON-LD document.
   public func compact(
     _ document: JSONLDDocument<Unresolved>,
-    context: JSONLDDocument<Unresolved>,
+    context: Contexts,
     baseIRI: String? = nil,
     compactArrays: Bool = true,
     compactToRelative: Bool = true
@@ -83,15 +83,17 @@ public class JSONLDProcessor {
   /// Compacts a collection of JSON-LD values.
   public func compact(
     _ values: JSONLDValues<Unresolved>,
-    context: JSONLDDocument<Unresolved>,
+    context: Contexts,
     baseIRI: String? = nil,
     compactArrays: Bool = true,
     compactToRelative: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Compacted> {
     try CompactionAlgorithm.validateInvalidCompactionInputs(values)
     let expanded = try await self.expandValues(values, baseIRI: baseIRI)
-    let algorithm = try CompactionAlgorithm(
-      context: context,
+    let activeContext = try await self.resolveActiveContext(context: context, baseIRI: baseIRI)
+    let algorithm = CompactionAlgorithm(
+      activeContext: activeContext,
+      contextValue: context.jsonValue,
       options: .init(
         baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
     )
@@ -101,13 +103,15 @@ public class JSONLDProcessor {
   /// Compacts expanded JSON-LD values.
   public func compact(
     _ values: JSONLDValues<Expanded>,
-    context: JSONLDDocument<Unresolved>,
+    context: Contexts,
     baseIRI: String? = nil,
     compactArrays: Bool = true,
     compactToRelative: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument<Compacted> {
-    let algorithm = try CompactionAlgorithm(
-      context: context,
+  ) async throws(JSONLDError) -> JSONLDDocument<Compacted> {
+    let activeContext = try await self.resolveActiveContext(context: context, baseIRI: baseIRI)
+    let algorithm = CompactionAlgorithm(
+      activeContext: activeContext,
+      contextValue: context.jsonValue,
       options: .init(
         baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
     )
@@ -117,13 +121,15 @@ public class JSONLDProcessor {
   /// Compacts flattened JSON-LD values.
   public func compact(
     _ values: JSONLDValues<Flattened>,
-    context: JSONLDDocument<Unresolved>,
+    context: Contexts,
     baseIRI: String? = nil,
     compactArrays: Bool = true,
     compactToRelative: Bool = true
-  ) throws(JSONLDError) -> JSONLDDocument<Compacted> {
-    let algorithm = try CompactionAlgorithm(
-      context: context,
+  ) async throws(JSONLDError) -> JSONLDDocument<Compacted> {
+    let activeContext = try await self.resolveActiveContext(context: context, baseIRI: baseIRI)
+    let algorithm = CompactionAlgorithm(
+      activeContext: activeContext,
+      contextValue: context.jsonValue,
       options: .init(
         baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
     )
@@ -160,7 +166,7 @@ public class JSONLDProcessor {
   /// Flattens and compacts the specified JSON-LD document.
   public func flatten(
     _ document: JSONLDDocument<Unresolved>,
-    context: JSONLDDocument<Unresolved>,
+    context: Contexts,
     baseIRI: String? = nil,
     compactArrays: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Compacted> {
@@ -175,12 +181,12 @@ public class JSONLDProcessor {
   /// Flattens and compacts a collection of JSON-LD values.
   public func flatten(
     _ values: JSONLDValues<Unresolved>,
-    context: JSONLDDocument<Unresolved>,
+    context: Contexts,
     baseIRI: String? = nil,
     compactArrays: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Compacted> {
     let flattened = try await self.flatten(values, baseIRI: baseIRI)
-    return try self.compact(
+    return try await self.compact(
       flattened.values,
       context: context,
       baseIRI: baseIRI,
@@ -192,7 +198,7 @@ public class JSONLDProcessor {
   /// Fetches a document from a URL and expands it.
   public func expand(
     url: String,
-    expandContext: JSONLDDocument<Unresolved>? = nil,
+    expandContext: Contexts? = nil,
     normative: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
     let result = await self.loader.load(url: url)
@@ -224,4 +230,25 @@ private struct DefaultLoader: JSONLDDocumentLoader {
         .loadingRemoteContextFailed,
         debugInfo: .init(url: url, message: "default loader is not implemented")))
   }
+}
+
+extension JSONLDProcessor {
+  private func resolveActiveContext(context: Contexts, baseIRI: String?) async throws(JSONLDError)
+    -> ActiveContext
+  {
+    var activeContext = ActiveContext.empty
+    if let baseIRI {
+      activeContext.baseIRI = baseIRI
+      activeContext.originalBaseIRI = baseIRI
+    }
+    return try await ContextResolver(
+      loader: self.loader,
+      allowEmptyVocabMapping: true,
+      allowRelativeVocabMapping: true
+    ).process(
+      contexts: context,
+      activeContext: activeContext
+    )
+  }
+
 }

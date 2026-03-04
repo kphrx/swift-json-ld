@@ -40,12 +40,12 @@ struct ActiveContext: Equatable, Sendable {
   }
 
   func process(
-    localContext: Contexts,
+    contexts: Contexts,
     remoteContexts: [String] = [],
     loader: (any JSONLDDocumentLoader)? = nil
   ) async throws(JSONLDError) -> ActiveContext {
     try await ContextResolver(loader: loader).process(
-      localContext: localContext,
+      contexts: contexts,
       activeContext: self,
       remoteContexts: remoteContexts
     )
@@ -67,14 +67,21 @@ struct ActiveContext: Equatable, Sendable {
     }
   }
 
-  mutating func applyVocabMapping(_ vocabMapping: ContextDefinition.VocabMapping?)
-    throws(JSONLDError)
-  {
+  mutating func applyVocabMapping(
+    _ vocabMapping: ContextDefinition.VocabMapping?,
+    allowEmptyMapping: Bool = false,
+    allowRelativeMapping: Bool = false
+  ) throws(JSONLDError) {
     guard let vocabMapping else { return }
     switch vocabMapping {
     case .string(let value):
-      if self.isAbsoluteIRI(value) || value.hasPrefix("_:") {
+      if (allowEmptyMapping && value.isEmpty)
+        || self.isAbsoluteIRI(value)
+        || value.hasPrefix("_:")
+      {
         self.vocabMapping = value
+      } else if allowRelativeMapping {
+        self.vocabMapping = try self.expandIRI(value, asDocumentRelative: true)
       } else {
         throw .code(.invalidVocabMapping)
       }
