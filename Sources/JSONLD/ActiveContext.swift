@@ -44,122 +44,59 @@ struct ActiveContext: Equatable, Sendable {
     remoteContexts: [String] = [],
     loader: (any JSONLDDocumentLoader)? = nil
   ) async throws(JSONLDError) -> ActiveContext {
-    var result = self
-
-    switch localContext {
-    case .null:
-      return .init(baseIRI: self.originalBaseIRI, originalBaseIRI: self.originalBaseIRI)
-    case .single(let context):
-      try await result.process(
-        context: context, remoteContexts: remoteContexts, loader: loader)
-    case .array(let contexts):
-      for context in contexts {
-        try await result.process(
-          context: context, remoteContexts: remoteContexts, loader: loader)
-      }
-    }
-
-    return result
+    try await ContextResolver(loader: loader).process(
+      localContext: localContext,
+      activeContext: self,
+      remoteContexts: remoteContexts
+    )
   }
 
-  private mutating func process(
-    context: Context,
-    remoteContexts: [String],
-    loader: (any JSONLDDocumentLoader)?
-  ) async throws(JSONLDError) {
-    switch context {
-    case .absoluteIRI(let iri), .relativeIRI(let iri):
-      let resolvedIRI = try self.expandIRI(iri, asDocumentRelative: true)
-
-      if remoteContexts.contains(resolvedIRI) {
-        throw .code(.recursiveContextInclusion)
+  mutating func applyBaseIRI(_ baseIRI: ContextDefinition.BaseIRI?) throws(JSONLDError) {
+    guard let baseIRI else { return }
+    switch baseIRI {
+    case .string(let value):
+      if value.isEmpty {
+        self.baseIRI = self.originalBaseIRI ?? self.baseIRI
+      } else if value.contains(":") {
+        self.baseIRI = value
+      } else {
+        self.baseIRI = try self.expandIRI(value, asDocumentRelative: true)
       }
-      if remoteContexts.count >= Self.maxRemoteContexts {
-        // TODO: Add processingMode and throw `.code(.contextOverflow)` in json-ld-1.1 mode.
-        throw .internalError(
-          .implementationLimitExceeded,
-          debugInfo: .init(url: resolvedIRI))
+    case .null:
+      self.baseIRI = nil
+    }
+  }
+
+  mutating func applyVocabMapping(_ vocabMapping: ContextDefinition.VocabMapping?)
+    throws(JSONLDError)
+  {
+    guard let vocabMapping else { return }
+    switch vocabMapping {
+    case .string(let value):
+      if self.isAbsoluteIRI(value) || value.hasPrefix("_:") {
+        self.vocabMapping = value
+      } else {
+        throw .code(.invalidVocabMapping)
       }
+    case .null:
+      self.vocabMapping = nil
+    }
+  }
 
-      var updatedRemoteContexts = remoteContexts
-      updatedRemoteContexts.append(resolvedIRI)
+  mutating func applyDefaultLanguage(_ defaultLanguage: ContextDefinition.DefaultLanguage?) {
+    guard let defaultLanguage else { return }
+    switch defaultLanguage {
+    case .string(let value):
+      self.defaultLanguage = value.lowercased()
+    case .null:
+      self.defaultLanguage = nil
+    }
+  }
 
-      guard let loader else {
-        throw .code(
-          .loadingRemoteContextFailed,
-          debugInfo: .init(url: resolvedIRI, message: "document loader is not configured"))
-      }
-
-      let result = await loader.load(url: resolvedIRI)
-      let remoteDocument: RemoteDocument =
-        switch result {
-        case .success(let doc):
-          doc
-        case .failure(let error):
-          throw .code(
-            .loadingRemoteContextFailed,
-            debugInfo: .init(url: resolvedIRI, message: String(describing: error)))
-        }
-
-      guard case .object(let obj) = remoteDocument.document,
-        let innerContext = obj[.context]
-      else {
-        throw .code(.invalidRemoteContext)
-      }
-
-      let remoteContext = try Contexts(from: innerContext)
-
-      var subContext = self
-      subContext.baseIRI = remoteDocument.documentURL
-
-      self = try await subContext.process(
-        localContext: remoteContext,
-        remoteContexts: updatedRemoteContexts,
-        loader: loader
-      )
-
-    case .contextDefinition(let definition):
-      if let baseIRI = definition.baseIRI {
-        switch baseIRI {
-        case .string(let value):
-          if value.isEmpty {
-            self.baseIRI = self.originalBaseIRI ?? self.baseIRI
-          } else if value.contains(":") {
-            self.baseIRI = value
-          } else {
-            self.baseIRI = try self.expandIRI(value, asDocumentRelative: true)
-          }
-        case .null:
-          self.baseIRI = nil
-        }
-      }
-
-      if let vocabMapping = definition.vocabMapping {
-        switch vocabMapping {
-        case .string(let value):
-          if self.isAbsoluteIRI(value) || value.hasPrefix("_:") {
-            self.vocabMapping = value
-          } else {
-            throw .code(.invalidVocabMapping)
-          }
-        case .null:
-          self.vocabMapping = nil
-        }
-      }
-
-      if let defaultLanguage = definition.defaultLanguage {
-        switch defaultLanguage {
-        case .string(let value):
-          self.defaultLanguage = value.lowercased()
-        case .null:
-          self.defaultLanguage = nil
-        }
-      }
-
-      var defined: [String: Bool] = [:]
-      for term in definition.terms.keys.sorted() {
-        try self.defineTerm(definition, term: term, defined: &defined)
-      }
+  mutating func applyTerms(from definition: ContextDefinition) throws(JSONLDError) {
+    var defined: [String: Bool] = [:]
+    for term in definition.terms.keys.sorted() {
+      try self.defineTerm(definition, term: term, defined: &defined)
     }
   }
 
