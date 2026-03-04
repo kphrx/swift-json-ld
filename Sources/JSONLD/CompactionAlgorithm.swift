@@ -55,7 +55,7 @@ struct CompactionAlgorithm {
     self.keywordAliases = keywordAliases
   }
 
-  func compact(_ values: JSONLDValues<Unresolved>) throws(JSONLDError) -> JSONLDDocument<Unresolved>
+  func compact(_ values: JSONLDValues<Unresolved>) throws(JSONLDError) -> JSONLDDocument<Compacted>
   {
     let input = values.jsonValue
     let elements: [JSONValue] =

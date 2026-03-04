@@ -21,15 +21,23 @@ struct FlatteningTests {
     let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
     let documentIRI = manifestBase + testCase.input
 
-    let actual = try await processor.flatten(
-      input,
-      context: context,
-      baseIRI: testCase.options.base ?? documentIRI,
-      compactArrays: testCase.options.compactArrays
-    )
+    let actual: JSONValue =
+      if let context {
+        try await processor.flatten(
+          input,
+          context: context,
+          baseIRI: testCase.options.base ?? documentIRI,
+          compactArrays: testCase.options.compactArrays
+        ).jsonValue
+      } else {
+        try await processor.flatten(
+          input,
+          baseIRI: testCase.options.base ?? documentIRI
+        ).jsonValue
+      }
     let expect = try TestCaseLoader.load(
       testCase.expectFilename, type: JSONLDDocument<Unresolved>.self)
-    #expect(actual.jsonValue == expect.jsonValue)
+    #expect(actual == expect.jsonValue)
   }
 
   @Test(
@@ -58,12 +66,19 @@ struct FlatteningTests {
       let context = try testCase.options.contextFilename.map { filename in
         try TestCaseLoader.load(filename, type: JSONLDDocument<Unresolved>.self)
       }
-      _ = try await processor.flatten(
-        input,
-        context: context,
-        baseIRI: testCase.options.base ?? documentIRI,
-        compactArrays: testCase.options.compactArrays
-      )
+      if let context {
+        _ = try await processor.flatten(
+          input,
+          context: context,
+          baseIRI: testCase.options.base ?? documentIRI,
+          compactArrays: testCase.options.compactArrays
+        )
+      } else {
+        _ = try await processor.flatten(
+          input,
+          baseIRI: testCase.options.base ?? documentIRI
+        )
+      }
     }
   }
 

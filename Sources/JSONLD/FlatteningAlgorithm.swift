@@ -11,7 +11,7 @@ struct FlatteningAlgorithm {
   private var nodeMap: [String: [String: JSONObject]] = [Self.defaultGraph: [:]]
 
   static func run(_ document: JSONLDDocument<Expanded>) throws(JSONLDError)
-    -> JSONLDDocument<Unresolved>
+    -> JSONLDDocument<Flattened>
   {
     var algorithm = Self()
     var list: [JSONValue]? = nil

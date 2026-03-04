@@ -49,3 +49,35 @@ public enum Expanded: JSONLDPhase {
     }
   }
 }
+
+public enum Flattened: JSONLDPhase {
+  public enum UnknownContent: Equatable, Sendable {}
+  public typealias ReversePropertyValue = JSONLDValue<Flattened>
+
+  public static func makeUnknown(from jsonObject: JSONObject) throws(JSONLDError) -> UnknownContent?
+  {
+    nil
+  }
+
+  public static func reversePropertyValue(from jsonValue: JSONValue) throws(JSONLDError)
+    -> ReversePropertyValue
+  {
+    try .init(from: jsonValue)
+  }
+}
+
+public enum Compacted: JSONLDPhase {
+  public enum UnknownContent: Equatable, Sendable {}
+  public typealias ReversePropertyValue = JSONLDValue<Compacted>
+
+  public static func makeUnknown(from jsonObject: JSONObject) throws(JSONLDError) -> UnknownContent?
+  {
+    nil
+  }
+
+  public static func reversePropertyValue(from jsonValue: JSONValue) throws(JSONLDError)
+    -> ReversePropertyValue
+  {
+    try .init(from: jsonValue)
+  }
+}
