@@ -4,7 +4,7 @@
 /// A structure representing a JSON-LD document.
 ///
 /// The document can be in different phases, such as `Unresolved` (raw input) or `Expanded`.
-public struct JSONLDDocument<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
+public struct JSONLDDocument<P: JSONLDPhase>: Equatable, CustomJSONValueConvertible {
   /// The retrieval URL of the document, if available.
   ///
   /// This is used as the default base IRI during expansion if no `@base` is specified.
@@ -22,7 +22,7 @@ public struct JSONLDDocument<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
     self.value.jsonValue
   }
 
-  public init(from jsonValue: JSONValue) throws(JSONLDError) {
+  init(validating jsonValue: JSONValue) throws(JSONLDError) {
     self.init(try .init(from: jsonValue))
   }
 
@@ -38,7 +38,13 @@ extension JSONLDDocument: Decodable where P == Unresolved {
   /// as `Expanded` documents should only be created through the expansion algorithm.
   public init(from decoder: Decoder) throws {
     let jsonValue = try JSONValue(from: decoder)
-    try self.init(from: jsonValue)
+    try self.init(validating: jsonValue)
+  }
+}
+
+extension JSONLDDocument: JSONLDValueProtocol where P == Unresolved {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
+    try self.init(validating: jsonValue)
   }
 }
 

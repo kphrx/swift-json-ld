@@ -55,7 +55,8 @@ struct CompactionAlgorithm {
     self.keywordAliases = keywordAliases
   }
 
-  func compact(_ values: JSONLDValues<Unresolved>) throws(JSONLDError) -> JSONLDDocument<Compacted>
+  func compact<P: JSONLDPhase>(_ values: JSONLDValues<P>) throws(JSONLDError)
+    -> JSONLDDocument<Compacted>
   {
     let input = values.jsonValue
     let elements: [JSONValue] =
@@ -87,7 +88,7 @@ struct CompactionAlgorithm {
       }
 
     guard case .object(var object) = compacted else {
-      return try .init(from: compacted)
+      return try .init(validating: compacted)
     }
 
     if !object.isEmpty {
@@ -95,7 +96,7 @@ struct CompactionAlgorithm {
         object[self.alias(for: JSONLDKeyword.context.rawValue)] = self.contextValue
       }
     }
-    return try .init(from: .object(object))
+    return try .init(validating: .object(object))
   }
 
   private func compactElement(_ value: JSONValue, activeProperty: String?) throws(JSONLDError)

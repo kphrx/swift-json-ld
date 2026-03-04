@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// A structure representing a collection of JSON-LD values.
-public struct JSONLDValues<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
+public struct JSONLDValues<P: JSONLDPhase>: Equatable, CustomJSONValueConvertible {
   let value: SingleOrMany<JSONLDValue<P>>
 
   init(_ value: SingleOrMany<JSONLDValue<P>>) {
@@ -13,7 +13,7 @@ public struct JSONLDValues<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
     self.value.jsonValue
   }
 
-  public init(from jsonValue: JSONValue) throws(JSONLDError) {
+  init(validating jsonValue: JSONValue) throws(JSONLDError) {
     self.init(try .init(from: jsonValue))
   }
 }
@@ -24,7 +24,13 @@ extension JSONLDValues: Decodable where P == Unresolved {
   /// This initializer is only available for the `Unresolved` phase.
   public init(from decoder: Decoder) throws {
     let jsonValue = try JSONValue(from: decoder)
-    try self.init(from: jsonValue)
+    try self.init(validating: jsonValue)
+  }
+}
+
+extension JSONLDValues: JSONLDValueProtocol where P == Unresolved {
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
+    try self.init(validating: jsonValue)
   }
 }
 

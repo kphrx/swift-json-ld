@@ -90,13 +90,44 @@ public class JSONLDProcessor {
   ) async throws(JSONLDError) -> JSONLDDocument<Compacted> {
     try CompactionAlgorithm.validateInvalidCompactionInputs(values)
     let expanded = try await self.expandValues(values, baseIRI: baseIRI)
-    let normalizedInput = try JSONLDValues<Unresolved>(from: expanded.jsonValue)
     let algorithm = try CompactionAlgorithm(
       context: context,
       options: .init(
         baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
     )
-    return try algorithm.compact(normalizedInput)
+    return try algorithm.compact(expanded)
+  }
+
+  /// Compacts expanded JSON-LD values.
+  public func compact(
+    _ values: JSONLDValues<Expanded>,
+    context: JSONLDDocument<Unresolved>,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true,
+    compactToRelative: Bool = true
+  ) throws(JSONLDError) -> JSONLDDocument<Compacted> {
+    let algorithm = try CompactionAlgorithm(
+      context: context,
+      options: .init(
+        baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
+    )
+    return try algorithm.compact(values)
+  }
+
+  /// Compacts flattened JSON-LD values.
+  public func compact(
+    _ values: JSONLDValues<Flattened>,
+    context: JSONLDDocument<Unresolved>,
+    baseIRI: String? = nil,
+    compactArrays: Bool = true,
+    compactToRelative: Bool = true
+  ) throws(JSONLDError) -> JSONLDDocument<Compacted> {
+    let algorithm = try CompactionAlgorithm(
+      context: context,
+      options: .init(
+        baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
+    )
+    return try algorithm.compact(values)
   }
 
   /// Flattens the specified JSON-LD document.
@@ -116,8 +147,14 @@ public class JSONLDProcessor {
     baseIRI: String? = nil
   ) async throws(JSONLDError) -> JSONLDDocument<Flattened> {
     let expanded = try await self.expandValues(values, baseIRI: baseIRI)
-    let expandedDocument = JSONLDDocument<Expanded>(normalizing: expanded, documentURL: baseIRI)
-    return try FlatteningAlgorithm.run(expandedDocument)
+    return try self.flatten(.init(normalizing: expanded, documentURL: baseIRI))
+  }
+
+  /// Flattens the specified expanded JSON-LD document.
+  public func flatten(_ document: JSONLDDocument<Expanded>) throws(JSONLDError)
+    -> JSONLDDocument<Flattened>
+  {
+    try FlatteningAlgorithm.run(document)
   }
 
   /// Flattens and compacts the specified JSON-LD document.
@@ -143,11 +180,13 @@ public class JSONLDProcessor {
     compactArrays: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Compacted> {
     let flattened = try await self.flatten(values, baseIRI: baseIRI)
-    let algorithm = try CompactionAlgorithm(
+    return try self.compact(
+      flattened.values,
       context: context,
-      options: .init(baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: true)
+      baseIRI: baseIRI,
+      compactArrays: compactArrays,
+      compactToRelative: true
     )
-    return try algorithm.compact(try .init(from: flattened.jsonValue))
   }
 
   /// Fetches a document from a URL and expands it.

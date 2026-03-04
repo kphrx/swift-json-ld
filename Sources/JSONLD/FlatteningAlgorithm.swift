@@ -45,7 +45,7 @@ struct FlatteningAlgorithm {
         algorithm.shouldInclude(node)
       }
 
-    return try .init(from: .array(flattened.map(JSONValue.object)))
+    return try .init(validating: .array(flattened.map(JSONValue.object)))
   }
 
   private mutating func generate(
