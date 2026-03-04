@@ -17,6 +17,21 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    # Fix swift-actions/setup-swift#798
+    - name: Import GPG keys
+      run: |
+        curl -LO https://swift.org/keys/automatic-signing-key-4.asc
+        if gunzip -t automatic-signing-key-4.asc 2>/dev/null; then
+          gunzip -c automatic-signing-key-4.asc | gpg --import
+        else
+          cat automatic-signing-key-4.asc | gpg --import
+        fi
+        curl -LO https://swift.org/keys/release-key-swift-6.x.asc
+        if gunzip -t release-key-swift-6.x.asc 2>/dev/null; then
+          gunzip -c release-key-swift-6.x.asc | gpg --import
+        else
+          cat release-key-swift-6.x.asc | gpg --import
+        fi
     - uses: swift-actions/setup-swift@v3
 
     - name: Build
