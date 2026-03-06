@@ -104,7 +104,7 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral,
 }
 
 extension JSONValue {
-  subscript(_ index: Int) -> JSONValue? {
+  public subscript(_ index: Int) -> JSONValue? {
     if case .array(let array) = self, array.indices.contains(index) {
       array[index]
     } else {
@@ -112,7 +112,7 @@ extension JSONValue {
     }
   }
 
-  subscript(_ key: String) -> JSONValue? {
+  public subscript(_ key: String) -> JSONValue? {
     if case .object(let object) = self {
       object[key]
     } else {
