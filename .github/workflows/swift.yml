@@ -45,7 +45,8 @@ jobs:
       run: |
         BINARY_PATH="$(swift build --show-bin-path)"
         CODECOV_PATH="$(swift test --show-codecov-path | xargs dirname)"
-        llvm-cov report -ignore-filename-regex="/.build/|/Tests/" -instr-profile "${CODECOV_PATH}/default.profdata" "${BINARY_PATH}/JSONCodablePackageTests.xctest" | sed 's/  \+/|/g;s/--\+/||||||||||||/;2s/|/-|/g;s/-|$/-|-/' >> "$GITHUB_STEP_SUMMARY"
+        llvm-cov report -ignore-filename-regex="/.build/|/Tests/" -instr-profile "${CODECOV_PATH}/default.profdata" "${BINARY_PATH}/JSONCodablePackageTests.xctest" \
+          | sed 's/  \+/|/g;s/--\+/||||||||||||/;2s/|/-|/g;s/-|$/-|-/' >> "$GITHUB_STEP_SUMMARY"
 
     - name: Setup pages
       uses: actions/configure-pages@v5
@@ -53,6 +54,8 @@ jobs:
 
     - name: Build documentation arguments
       id: docs-args
+      env:
+        SOURCE_BASE_URL: ${{ github.server_url }}/${{ github.event.pull_request.head.repo.full_name || github.repository }}/blob/${{ github.head_ref || github.ref_name }}
       run: |
         if [ "$(swift package dump-package | jq -r '.products | length')" != "1" ]; then
           echo "combined=--enable-experimental-combined-documentation" >> "$GITHUB_OUTPUT"
@@ -60,7 +63,7 @@ jobs:
         if [ -n "${{ steps.pages.outputs.base_path }}" ]; then
           echo "base_path=--hosting-base-path ${{ steps.pages.outputs.base_path }}" >> "$GITHUB_OUTPUT"
         fi
-        echo "source_base_url=${{ github.server_url }}/${{ github.event.pull_request.head.repo.full_name || github.repository }}/blob/${{ github.head_ref || github.ref_name }}" >> "$GITHUB_OUTPUT"
+        echo "source_base_url=$SOURCE_BASE_URL" >> "$GITHUB_OUTPUT"
 
     - name: Generate documentation
       run: |
@@ -68,6 +71,7 @@ jobs:
           --disable-indexing ${{ steps.docs-args.outputs.combined }} --symbol-graph-minimum-access-level public \
           --checkout-path "$PWD" --source-service github --source-service-base-url ${{ steps.docs-args.outputs.source_base_url }} \
           --transform-for-static-hosting ${{ steps.docs-args.outputs.base_path }}
+        mv _site/{index,404}.html
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
