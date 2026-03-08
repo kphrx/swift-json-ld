@@ -3,16 +3,52 @@
 
 import class Foundation.JSONEncoder
 
+/// A JSON array represented with ``JSONValue`` elements.
 public typealias JSONArray = [JSONValue]
+/// A JSON object represented as a string-keyed dictionary of ``JSONValue``.
 public typealias JSONObject = [String: JSONValue]
 
+/// A strongly typed representation of any JSON value.
+///
+/// When decoding from JSON, numeric values are preferentially decoded as ``integer(_:)``
+/// if they can be represented as an `Int`; otherwise, they are decoded as ``float(_:)``.
+///
+/// ### Building JSON Values
+///
+/// You can create ``JSONValue`` instances using literals:
+///
+/// ```swift
+/// let payload: JSONValue = [
+///   "name": "apple",
+///   "count": 3,
+///   "tags": ["fruit", "food"]
+/// ]
+/// ```
+///
+/// ### Accessing Data
+///
+/// You can use subscripts to access nested data in arrays and objects, and use type initializers
+/// to safely extract values:
+///
+/// ```swift
+/// let name = String(payload["name"] ?? .null)         // Optional("apple")
+/// let count = Int(payload["count"] ?? .null)          // Optional(3)
+/// let firstTag = String(payload["tags"]?[0] ?? .null) // Optional("fruit")
+/// ```
 public enum JSONValue: Sendable, Equatable {
+  /// A JSON string value.
   case string(String)
+  /// A JSON integer number value.
   case integer(Int)
+  /// A JSON floating-point number value.
   case float(Double)
+  /// A JSON boolean value.
   case boolean(Bool)
+  /// A JSON null value.
   case null
+  /// A JSON array value.
   case array(JSONArray)
+  /// A JSON object value.
   case object(JSONObject)
 }
 
@@ -57,37 +93,45 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral,
   ExpressibleByIntegerLiteral, ExpressibleByFloatLiteral, ExpressibleByStringLiteral,
   ExpressibleByArrayLiteral, ExpressibleByDictionaryLiteral
 {
+  /// Creates `.null`.
   public init(nilLiteral: ()) {
     self = .null
   }
 
+  /// Creates `.boolean(value)`.
   public init(booleanLiteral value: BooleanLiteralType) {
     self = .boolean(value)
   }
 
+  /// Creates `.integer(value)`.
   public init(integerLiteral value: IntegerLiteralType) {
     self = .integer(value)
   }
 
+  /// Creates `.float(value)`.
   public init(floatLiteral value: FloatLiteralType) {
     self = .float(value)
   }
 
+  /// Creates `.string(value)`.
   public init(stringLiteral value: StringLiteralType) {
     self = .string(value)
   }
 
+  /// Creates `.array(elements)`.
   public init(arrayLiteral elements: Self...) {
     self = .array(elements)
   }
 
+  /// Creates `.object` from key-value pairs.
   public init(dictionaryLiteral elements: (String, Self)...) {
     self = .object(.init(uniqueKeysWithValues: elements))
   }
 }
 
 extension JSONValue {
-  subscript(_ index: Int) -> JSONValue? {
+  /// Accesses the element at the specified index.
+  public subscript(_ index: Int) -> JSONValue? {
     if case .array(let array) = self, array.indices.contains(index) {
       array[index]
     } else {
@@ -95,7 +139,8 @@ extension JSONValue {
     }
   }
 
-  subscript(_ key: String) -> JSONValue? {
+  /// Accesses the value associated with the specified key.
+  public subscript(_ key: String) -> JSONValue? {
     if case .object(let object) = self {
       object[key]
     } else {
@@ -104,7 +149,15 @@ extension JSONValue {
   }
 }
 
+extension JSONValue: CustomJSONValueConvertible {
+  /// Returns `self`.
+  public var jsonValue: JSONValue {
+    self
+  }
+}
+
 extension JSONValue: CustomDebugStringConvertible {
+  /// A pretty-printed JSON string for debugging.
   public var debugDescription: String {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
