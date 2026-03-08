@@ -9,6 +9,32 @@ public typealias JSONArray = [JSONValue]
 public typealias JSONObject = [String: JSONValue]
 
 /// A strongly typed representation of any JSON value.
+///
+/// When decoding from JSON, numeric values are preferentially decoded as ``integer(_:)``
+/// if they can be represented as an `Int`; otherwise, they are decoded as ``float(_:)``.
+///
+/// ### Building JSON Values
+///
+/// You can create ``JSONValue`` instances using literals:
+///
+/// ```swift
+/// let payload: JSONValue = [
+///   "name": "apple",
+///   "count": 3,
+///   "tags": ["fruit", "food"]
+/// ]
+/// ```
+///
+/// ### Accessing Data
+///
+/// You can use subscripts to access nested data in arrays and objects, and use type initializers
+/// to safely extract values:
+///
+/// ```swift
+/// let name = String(payload["name"] ?? .null)         // Optional("apple")
+/// let count = Int(payload["count"] ?? .null)          // Optional(3)
+/// let firstTag = String(payload["tags"]?[0] ?? .null) // Optional("fruit")
+/// ```
 public enum JSONValue: Sendable, Equatable {
   /// A JSON string value.
   case string(String)
@@ -104,6 +130,7 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral,
 }
 
 extension JSONValue {
+  /// Accesses the element at the specified index.
   public subscript(_ index: Int) -> JSONValue? {
     if case .array(let array) = self, array.indices.contains(index) {
       array[index]
@@ -112,12 +139,20 @@ extension JSONValue {
     }
   }
 
+  /// Accesses the value associated with the specified key.
   public subscript(_ key: String) -> JSONValue? {
     if case .object(let object) = self {
       object[key]
     } else {
       nil
     }
+  }
+}
+
+extension JSONValue: CustomJSONValueConvertible {
+  /// Returns `self`.
+  public var jsonValue: JSONValue {
+    self
   }
 }
 

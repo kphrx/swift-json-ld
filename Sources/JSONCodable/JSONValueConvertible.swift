@@ -8,18 +8,42 @@ public protocol CustomJSONValueConvertible {
 }
 
 /// A type that can provide a JSON array representation.
+///
+/// Types conforming to this protocol automatically provide a ``JSONValue/array(_:)``
+/// representation via the ``CustomJSONValueConvertible/jsonValue`` property.
 public protocol CustomJSONArrayConvertible: CustomJSONValueConvertible {
   /// Returns this value as a ``JSONArray``.
   var jsonArray: JSONArray { get }
 }
 
 /// A type that can provide a JSON object representation.
+///
+/// Types conforming to this protocol automatically provide a ``JSONValue/object(_:)``
+/// representation via the ``CustomJSONValueConvertible/jsonValue`` property.
 public protocol CustomJSONObjectConvertible: CustomJSONValueConvertible {
   /// Returns this value as a ``JSONObject``.
   var jsonObject: JSONObject { get }
 }
 
 /// A type that can be losslessly converted from and to ``JSONValue``.
+///
+/// Use this protocol to provide a two-way conversion between a custom type and a ``JSONValue``.
+/// Conforming types can be used to extract values from a ``JSONValue`` using their initializers:
+///
+/// ```swift
+/// let url = URL(jsonValue ?? .null)
+/// ```
+///
+/// ```swift
+/// extension URL: LosslessJSONValueConvertible {
+///   public init?(_ jsonValue: JSONValue) {
+///     guard case .string(let string) = jsonValue else { return nil }
+///     self.init(string: string)
+///   }
+///
+///   public var jsonValue: JSONValue { .string(absoluteString) }
+/// }
+/// ```
 public protocol LosslessJSONValueConvertible: CustomJSONValueConvertible {
   /// Creates an instance from a ``JSONValue`` if conversion is possible.
   init?(_ jsonValue: JSONValue)
