@@ -72,6 +72,31 @@ jobs:
           --checkout-path "$PWD" --source-service github --source-service-base-url ${{ steps.docs-args.outputs.source_base_url }} \
           --transform-for-static-hosting ${{ steps.docs-args.outputs.base_path }}
         mv _site/{index,404}.html
+        cat <<'EOF' | sed 's#{{BASE_PATH}}#${{ steps.pages.outputs.base_path }}#g' | sed "s#{{DOCUMENT_PATH}}#$(jq -r '.interfaceLanguages.swift[0].path' _site/index/index.json)#g" | tee _site/index.html
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta http-equiv="refresh" content="0; url={{BASE_PATH}}{{DOCUMENT_PATH}}">
+        <title>Redirecting...</title>
+        <style>
+          :root { color-scheme: light dark; }
+          body {
+            font-family: sans-serif;
+            background-color: light-dark(#ffffff, #000000);
+            color: light-dark(#000000, #ffffff);
+            text-align: center;
+            margin-top: 5rem;
+          }
+          a { color: light-dark(#3366ff, #0099ff); text-decoration: none; }
+          a:hover { text-decoration: underline; }
+        </style>
+        </head>
+        <body>
+          <p>Redirecting to <a href="{{BASE_PATH}}{{DOCUMENT_PATH}}">documentation</a>...</p>
+        </body>
+        </html>
+        EOF
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
