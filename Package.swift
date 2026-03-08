@@ -15,10 +15,13 @@ let package = Package(
     // Products define the executables and libraries a package produces, making them visible to other packages.
     .library(
       name: "JSONCodable",
-      targets: ["JSONCodable"])
+      targets: ["JSONCodable"]),
+    .library(
+      name: "JSONLD",
+      targets: ["JSONLD"]),
   ],
   dependencies: [
-      .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6"),
+    .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6")
   ],
   targets: [
     // Targets are the basic building blocks of a package, defining a module or a test suite.
