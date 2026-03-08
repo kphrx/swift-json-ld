@@ -1,0 +1,124 @@
+# This workflow will build a Swift project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
+
+name: Swift
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    # Fix swift-actions/setup-swift#798
+    - name: Import GPG keys
+      run: |
+        curl -LO https://swift.org/keys/automatic-signing-key-4.asc
+        if gunzip -t automatic-signing-key-4.asc 2>/dev/null; then
+          gunzip -c automatic-signing-key-4.asc | gpg --import
+        else
+          cat automatic-signing-key-4.asc | gpg --import
+        fi
+        curl -LO https://swift.org/keys/release-key-swift-6.x.asc
+        if gunzip -t release-key-swift-6.x.asc 2>/dev/null; then
+          gunzip -c release-key-swift-6.x.asc | gpg --import
+        else
+          cat release-key-swift-6.x.asc | gpg --import
+        fi
+    - uses: swift-actions/setup-swift@v3
+
+    - name: Build
+      run: swift build ${{ runner.debug == '1' && '--verbose' || '' }}
+    - name: Build test code
+      run: swift build --build-tests --enable-code-coverage ${{ runner.debug == '1' && '--verbose' || '' }}
+    - name: Run tests
+      run: swift test --skip-build --disable-xctest --enable-code-coverage ${{ runner.debug == '1' && '--verbose' || '' }}
+
+    - name: Generate lcov report
+      run: |
+        BINARY_PATH="$(swift build --show-bin-path)"
+        CODECOV_PATH="$(swift test --show-codecov-path | xargs dirname)"
+        llvm-cov report -ignore-filename-regex="/.build/|/Tests/" -instr-profile "${CODECOV_PATH}/default.profdata" "${BINARY_PATH}/JSONCodablePackageTests.xctest" \
+          | sed 's/  \+/|/g;s/--\+/||||||||||||/;2s/|/-|/g;s/-|$/-|-/' >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Setup pages
+      uses: actions/configure-pages@v5
+      id: pages
+
+    - name: Build documentation arguments
+      id: docs-args
+      env:
+        SOURCE_BASE_URL: ${{ github.server_url }}/${{ github.event.pull_request.head.repo.full_name || github.repository }}/blob/${{ github.head_ref || github.ref_name }}
+      run: |
+        if [ "$(swift package dump-package | jq -r '.products | length')" != "1" ]; then
+          echo "combined=--enable-experimental-combined-documentation" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -n "${{ steps.pages.outputs.base_path }}" ]; then
+          echo "base_path=--hosting-base-path ${{ steps.pages.outputs.base_path }}" >> "$GITHUB_OUTPUT"
+        fi
+        echo "source_base_url=$SOURCE_BASE_URL" >> "$GITHUB_OUTPUT"
+
+    - name: Generate documentation
+      run: |
+        swift package --allow-writing-to-package-directory generate-documentation --output-path _site/ \
+          --disable-indexing ${{ steps.docs-args.outputs.combined }} --symbol-graph-minimum-access-level public \
+          --checkout-path "$PWD" --source-service github --source-service-base-url ${{ steps.docs-args.outputs.source_base_url }} \
+          --transform-for-static-hosting ${{ steps.docs-args.outputs.base_path }}
+        mv _site/{index,404}.html
+        cat <<'EOF' | sed 's#{{BASE_PATH}}#${{ steps.pages.outputs.base_path }}#g' | sed "s#{{DOCUMENT_PATH}}#$(jq -r '.interfaceLanguages.swift[0].path' _site/index/index.json)#g" | tee _site/index.html
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta http-equiv="refresh" content="0; url={{BASE_PATH}}{{DOCUMENT_PATH}}">
+        <title>Redirecting...</title>
+        <style>
+          :root { color-scheme: light dark; }
+          body {
+            font-family: sans-serif;
+            background-color: light-dark(#ffffff, #000000);
+            color: light-dark(#000000, #ffffff);
+            text-align: center;
+            margin-top: 5rem;
+          }
+          a { color: light-dark(#3366ff, #0099ff); text-decoration: none; }
+          a:hover { text-decoration: underline; }
+        </style>
+        </head>
+        <body>
+          <p>Redirecting to <a href="{{BASE_PATH}}{{DOCUMENT_PATH}}">documentation</a>...</p>
+        </body>
+        </html>
+        EOF
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+
+  deploy:
+
+    runs-on: ubuntu-latest
+    needs: build
+    # if: github.event_name != 'pull_request'
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

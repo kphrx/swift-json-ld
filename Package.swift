@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-  name: "JSONCodable",
+  name: "swift-json-codable",
   platforms: [
     .macOS(.v10_15),
     .iOS(.v13),
@@ -16,6 +16,9 @@ let package = Package(
     .library(
       name: "JSONCodable",
       targets: ["JSONCodable"])
+  ],
+  dependencies: [
+      .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6"),
   ],
   targets: [
     // Targets are the basic building blocks of a package, defining a module or a test suite.
