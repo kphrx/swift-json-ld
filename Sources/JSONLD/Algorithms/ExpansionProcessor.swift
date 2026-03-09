@@ -38,175 +38,291 @@ enum ExpansionProcessor {
   ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
     switch value {
     case .unknown(let content):
-      return try await self.expandObject(
+      try await self.expandObject(
         activeContext, object: content, property: property, insideList: insideList, loader: loader)
 
     case .invalid(let invalid):
-      switch invalid {
-      case .listOfLists: throw .code(.listOfLists)
-      case .notJSONLDValue: return nil
-      }
+      try self.handleInvalidValue(invalid)
 
     case .iriOrTerm(let string):
-      if property == nil || property == "@graph" {
-        return nil
-      }
-      if let property {
-        var mutableContext = activeContext
-        if let typeMapping = mutableContext.typeMapping(for: property) {
-          if typeMapping == "@id" {
-            let expandedId =
-              if self.shouldUseIRIExpansion(string, activeContext: mutableContext) {
-                try mutableContext.expandIRI(string, asDocumentRelative: true)
-              } else {
-                self.resolveDocumentRelativeIRI(string, baseIRI: mutableContext.baseIRI)
-              }
-            return try .node(.init(from: .object(["@id": .string(expandedId)])))
-          }
-          if typeMapping == "@vocab" {
-            var expandedId = try mutableContext.expandIRI(string, asVocab: true)
-            if !expandedId.contains(":") {
-              expandedId = try mutableContext.expandIRI(expandedId, asDocumentRelative: true)
-            }
-            return try .node(.init(from: .object(["@id": .string(expandedId)])))
-          }
-          return try .value(
-            .init(from: .object(["@value": .string(string), "@type": .string(typeMapping)])))
-        } else if let languageMapping = mutableContext.languageMapping(for: property) {
-          return try .value(
-            .init(
-              from: .object(["@value": .string(string), "@language": .string(languageMapping)])))
-        } else if mutableContext.hasLanguageMapping(for: property) {
-          return try .value(.init(from: .object(["@value": .string(string)])))
-        } else if let defaultLanguage = mutableContext.defaultLanguage {
-          return try .value(
-            .init(
-              from: .object(["@value": .string(string), "@language": .string(defaultLanguage)])))
-        }
-      }
-      return try .value(.init(from: .object(["@value": .string(string)])))
+      try self.expandScalar(activeContext, value: string, property: property)
 
     case .integer(let integer):
-      guard let property else { return nil }
-      if property == "@graph" { return nil }
-      if let typeMapping = activeContext.typeMapping(for: property), typeMapping != "@id",
-        typeMapping != "@vocab"
-      {
-        return try .value(
-          .init(from: .object(["@value": .integer(integer), "@type": .string(typeMapping)])))
-      }
-      return try .value(.init(from: .object(["@value": .integer(integer)])))
+      try self.expandScalar(activeContext, value: integer, property: property)
 
     case .float(let float):
-      guard let property else { return nil }
-      if property == "@graph" { return nil }
-      if let typeMapping = activeContext.typeMapping(for: property), typeMapping != "@id",
-        typeMapping != "@vocab"
-      {
-        return try .value(
-          .init(from: .object(["@value": .float(float), "@type": .string(typeMapping)])))
-      }
-      return try .value(.init(from: .object(["@value": .float(float)])))
+      try self.expandScalar(activeContext, value: float, property: property)
 
     case .boolean(let boolean):
-      guard let property else { return nil }
-      if property == "@graph" { return nil }
-      if let typeMapping = activeContext.typeMapping(for: property), typeMapping != "@id",
-        typeMapping != "@vocab"
-      {
-        return try .value(
-          .init(from: .object(["@value": .boolean(boolean), "@type": .string(typeMapping)])))
-      }
-      return try .value(.init(from: .object(["@value": .boolean(boolean)])))
+      try self.expandScalar(activeContext, value: boolean, property: property)
 
     case .null:
-      return nil
+      nil
 
     case .node(let nodeObject):
-      var activeContext = activeContext
-      if let localContext = nodeObject.context {
-        activeContext = try await activeContext.process(
-          contexts: localContext, loader: loader)
-      }
-
-      var combinedProperties = nodeObject.properties
-      if let id = nodeObject.id { combinedProperties["@id"] = .single(.iriOrTerm(id)) }
-      if let types = nodeObject.type {
-        combinedProperties["@type"] = .many(types.map { .iriOrTerm($0) })
-      }
-      if let graph = nodeObject.graph {
-        combinedProperties["@graph"] = graph
-      }
-      if let index = nodeObject.index {
-        combinedProperties["@index"] = .single(.iriOrTerm(index))
-      }
-      if let reverse = nodeObject.reverse {
-        combinedProperties["@reverse"] = try .init(from: reverse.jsonValue)
-      }
-
-      return try await self.expandObject(
-        activeContext, object: combinedProperties, property: property, insideList: insideList,
-        loader: loader)
+      try await self.expandNode(
+        activeContext, node: nodeObject, property: property, insideList: insideList, loader: loader)
 
     case .value(let valueObject):
-      let object = try valueObject.jsonObject.mapValuesWithTypedThrows(
-        SingleOrMany<JSONLDValue<Unresolved>>.init(from:)
-      )
-      return try await self.expandObject(
-        activeContext, object: object, property: property, insideList: insideList, loader: loader)
+      try await self.expandValue(
+        activeContext, value: valueObject, property: property, insideList: insideList,
+        loader: loader)
 
     case .setOrList(let setOrListObject):
-      switch setOrListObject {
-      case .set(let values, _, let index):
-        let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
-        let expanded = try await self.expand(
-          activeContext, value: .many(unresolvedItems), property: property, insideList: insideList,
-          loader: loader)
-        return try .setOrList(
-          .set(.many(expanded.map { .init($0) }), context: nil, index: index))
-      case .list(let values, _, let index):
-        if insideList { throw .code(.listOfLists) }
-        let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
-        let expanded = try await self.expand(
-          activeContext, value: .many(unresolvedItems), property: property, insideList: true,
-          loader: loader)
-
-        for item in expanded {
-          if case .setOrList(.list) = item {
-            throw .code(.listOfLists)
-          }
-        }
-
-        return try .setOrList(
-          .list(.many(expanded.map { .init($0) }), context: nil, index: index))
-      }
+      try await self.expandSetOrList(
+        activeContext, setOrList: setOrListObject, property: property, insideList: insideList,
+        loader: loader)
 
     case .languageMap(let languageMap):
-      var expandedItems: [JSONLDValue<Expanded>] = []
-      for (lang, values) in languageMap.map.sorted(by: { $0.key < $1.key }) {
-        for val in values {
-          guard case .string(let s) = val else { throw .code(.invalidLanguageMapValue) }
-          expandedItems.append(
-            try .value(
-              .init(from: .object(["@value": .string(s), "@language": .string(lang.lowercased())])))
-          )
-        }
-      }
-      return .setOrList(
-        .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
+      try self.expandLanguageMap(activeContext, languageMap: languageMap)
 
     case .indexMap(let indexMap):
-      var expandedItems: [JSONLDValue<Expanded>] = []
-      for (_, values) in indexMap.map.sorted(by: { $0.key < $1.key }) {
-        let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
-        let expanded = try await self.expand(
-          activeContext, value: .many(unresolvedItems), property: property, insideList: insideList,
-          loader: loader)
-        expandedItems.append(contentsOf: expanded)
-      }
-      return .setOrList(
-        .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
+      try await self.expandIndexMap(
+        activeContext, indexMap: indexMap, property: property, insideList: insideList,
+        loader: loader
+      )
     }
+  }
+
+  private static func handleInvalidValue(_ invalid: JSONLDValue<Unresolved>.InvalidValue)
+    throws(JSONLDError) -> JSONLDValue<Expanded>?
+  {
+    switch invalid {
+    case .listOfLists: throw .code(.listOfLists)
+    case .notJSONLDValue: nil
+    }
+  }
+
+  private static func expandScalar(
+    _ activeContext: ActiveContext,
+    value: String,
+    property: String?
+  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
+    if property == nil || property == "@graph" {
+      return nil
+    }
+
+    guard let property else { return nil }
+
+    if let typeMapping = activeContext.typeMapping(for: property) {
+      if typeMapping == "@id" {
+        let expandedId =
+          if self.shouldUseIRIExpansion(value, activeContext: activeContext) {
+            try activeContext.expandIRI(value, asDocumentRelative: true)
+          } else {
+            self.resolveDocumentRelativeIRI(value, baseIRI: activeContext.baseIRI)
+          }
+        return try .node(.init(from: .object(["@id": .string(expandedId)])))
+      }
+      if typeMapping == "@vocab" {
+        var expandedId = try activeContext.expandIRI(value, asVocab: true)
+        if !expandedId.contains(":") {
+          expandedId = try activeContext.expandIRI(expandedId, asDocumentRelative: true)
+        }
+        return try .node(.init(from: .object(["@id": .string(expandedId)])))
+      }
+      return try .value(
+        .init(from: .object(["@value": .string(value), "@type": .string(typeMapping)])))
+    }
+
+    if let languageMapping = activeContext.languageMapping(for: property) {
+      return try .value(
+        .init(from: .object(["@value": .string(value), "@language": .string(languageMapping)])))
+    }
+
+    if activeContext.hasLanguageMapping(for: property) {
+      return try .value(.init(from: .object(["@value": .string(value)])))
+    }
+
+    if let defaultLanguage = activeContext.defaultLanguage {
+      return try .value(
+        .init(from: .object(["@value": .string(value), "@language": .string(defaultLanguage)])))
+    }
+
+    return try .value(.init(from: .object(["@value": .string(value)])))
+  }
+
+  private static func expandScalar(
+    _ activeContext: ActiveContext,
+    value: Int,
+    property: String?
+  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
+    if property == nil || property == "@graph" {
+      return nil
+    }
+
+    guard let property else { return nil }
+
+    if let typeMapping = activeContext.typeMapping(for: property) {
+      if typeMapping == "@id" || typeMapping == "@vocab" {
+        return try .value(.init(from: .object(["@value": .integer(value)])))
+      }
+      return try .value(
+        .init(from: .object(["@value": .integer(value), "@type": .string(typeMapping)])))
+    }
+
+    return try .value(.init(from: .object(["@value": .integer(value)])))
+  }
+
+  private static func expandScalar(
+    _ activeContext: ActiveContext,
+    value: Double,
+    property: String?
+  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
+    if property == nil || property == "@graph" {
+      return nil
+    }
+
+    guard let property else { return nil }
+
+    if let typeMapping = activeContext.typeMapping(for: property) {
+      if typeMapping == "@id" || typeMapping == "@vocab" {
+        return try .value(.init(from: .object(["@value": .float(value)])))
+      }
+      return try .value(
+        .init(from: .object(["@value": .float(value), "@type": .string(typeMapping)])))
+    }
+
+    return try .value(.init(from: .object(["@value": .float(value)])))
+  }
+
+  private static func expandScalar(
+    _ activeContext: ActiveContext,
+    value: Bool,
+    property: String?
+  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
+    if property == nil || property == "@graph" {
+      return nil
+    }
+
+    guard let property else { return nil }
+
+    if let typeMapping = activeContext.typeMapping(for: property) {
+      if typeMapping == "@id" || typeMapping == "@vocab" {
+        return try .value(.init(from: .object(["@value": .boolean(value)])))
+      }
+      return try .value(
+        .init(from: .object(["@value": .boolean(value), "@type": .string(typeMapping)])))
+    }
+
+    return try .value(.init(from: .object(["@value": .boolean(value)])))
+  }
+
+  private static func expandNode(
+    _ activeContext: ActiveContext,
+    node: NodeObject<Unresolved>,
+    property: String?,
+    insideList: Bool,
+    loader: (any JSONLDDocumentLoader)?
+  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+    var activeContext = activeContext
+    if let localContext = node.context {
+      activeContext = try await activeContext.process(
+        contexts: localContext, loader: loader)
+    }
+
+    var combinedProperties = node.properties
+    if let id = node.id { combinedProperties["@id"] = .single(.iriOrTerm(id)) }
+    if let types = node.type {
+      combinedProperties["@type"] = .many(types.map { .iriOrTerm($0) })
+    }
+    if let graph = node.graph {
+      combinedProperties["@graph"] = graph
+    }
+    if let index = node.index {
+      combinedProperties["@index"] = .single(.iriOrTerm(index))
+    }
+    if let reverse = node.reverse {
+      combinedProperties["@reverse"] = try .init(from: reverse.jsonValue)
+    }
+
+    return try await self.expandObject(
+      activeContext, object: combinedProperties, property: property, insideList: insideList,
+      loader: loader)
+  }
+
+  private static func expandValue(
+    _ activeContext: ActiveContext,
+    value: ValueObject<Unresolved>,
+    property: String?,
+    insideList: Bool,
+    loader: (any JSONLDDocumentLoader)?
+  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+    let object = try value.jsonObject.mapValuesWithTypedThrows(
+      SingleOrMany<JSONLDValue<Unresolved>>.init(from:)
+    )
+    return try await self.expandObject(
+      activeContext, object: object, property: property, insideList: insideList, loader: loader)
+  }
+
+  private static func expandSetOrList(
+    _ activeContext: ActiveContext,
+    setOrList: SetOrListObject<Unresolved>,
+    property: String?,
+    insideList: Bool,
+    loader: (any JSONLDDocumentLoader)?
+  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+    switch setOrList {
+    case .set(let values, _, let index):
+      let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
+      let expanded = try await self.expand(
+        activeContext, value: .many(unresolvedItems), property: property, insideList: insideList,
+        loader: loader)
+      return try .setOrList(
+        .set(.many(expanded.map { .init($0) }), context: nil, index: index))
+    case .list(let values, _, let index):
+      if insideList { throw .code(.listOfLists) }
+      let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
+      let expanded = try await self.expand(
+        activeContext, value: .many(unresolvedItems), property: property, insideList: true,
+        loader: loader)
+
+      for item in expanded {
+        if case .setOrList(.list) = item {
+          throw .code(.listOfLists)
+        }
+      }
+
+      return try .setOrList(
+        .list(.many(expanded.map { .init($0) }), context: nil, index: index))
+    }
+  }
+
+  private static func expandLanguageMap(
+    _ activeContext: ActiveContext,
+    languageMap: LanguageMap<Unresolved>
+  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
+    var expandedItems: [JSONLDValue<Expanded>] = []
+    for (lang, values) in languageMap.map.sorted(by: { $0.key < $1.key }) {
+      for val in values {
+        guard case .string(let s) = val else { throw .code(.invalidLanguageMapValue) }
+        expandedItems.append(
+          try .value(
+            .init(from: .object(["@value": .string(s), "@language": .string(lang.lowercased())])))
+        )
+      }
+    }
+    return .setOrList(
+      .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
+  }
+
+  private static func expandIndexMap(
+    _ activeContext: ActiveContext,
+    indexMap: IndexMap<Unresolved>,
+    property: String?,
+    insideList: Bool,
+    loader: (any JSONLDDocumentLoader)?
+  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+    var expandedItems: [JSONLDValue<Expanded>] = []
+    for (_, values) in indexMap.map.sorted(by: { $0.key < $1.key }) {
+      let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
+      let expanded = try await self.expand(
+        activeContext, value: .many(unresolvedItems), property: property, insideList: insideList,
+        loader: loader)
+      expandedItems.append(contentsOf: expanded)
+    }
+    return .setOrList(
+      .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
   }
 
   private static func expandObject(
@@ -237,324 +353,442 @@ enum ExpansionProcessor {
         throw .code(.collidingKeywords)
 
       case .id?:
-        guard case .single(.iriOrTerm(let idStr)) = val else { throw .code(.invalidIdValue) }
-        let expandedId =
-          if self.shouldUseIRIExpansion(idStr, activeContext: activeContext) {
-            try activeContext.expandIRI(idStr, asDocumentRelative: true)
-          } else {
-            self.resolveDocumentRelativeIRI(idStr, baseIRI: activeContext.baseIRI)
-          }
-        expandedProperties[expandedProperty] = .string(expandedId)
+        try self.expandIdKeyword(
+          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext)
 
       case .type?:
-        var expandedTypes: [JSONValue] = []
-        for item in val {
-          guard case .iriOrTerm(let s) = item else { throw .code(.invalidTypeValue) }
-          let expandedType = try activeContext.expandIRI(
-            s, asVocab: true, asDocumentRelative: true)
-          expandedTypes.append(.string(expandedType))
-        }
-        expandedProperties[expandedProperty] = .array(expandedTypes)
+        try self.expandTypeKeyword(
+          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext)
 
       case .value?:
-        let value = val.jsonValue
-        if case .object = value { throw .code(.invalidValueObjectValue) }
-        if case .array = value { throw .code(.invalidValueObjectValue) }
-        expandedProperties[expandedProperty] = value
+        try self.expandValueKeyword(val, into: &expandedProperties, key: expandedProperty)
 
       case .language?:
-        guard case .single(.iriOrTerm(let langStr)) = val else {
-          throw .code(.invalidLanguageTaggedString)
-        }
-        expandedProperties[expandedProperty] = .string(langStr.lowercased())
+        try self.expandLanguageKeyword(val, into: &expandedProperties, key: expandedProperty)
 
       case .list?:
-        if insideList { throw .code(.listOfLists) }
-        let expandedList = try await self.expand(
-          activeContext, value: val, property: property, insideList: true, loader: loader)
-
-        for item in expandedList {
-          if case .setOrList(.list) = item {
-            throw .code(.listOfLists)
-          }
-        }
-        expandedProperties[expandedProperty] = .array(expandedList.map(\.jsonValue))
+        try await self.expandListKeyword(
+          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext,
+          property: property, insideList: insideList, loader: loader)
 
       case .set?:
-        let expandedSet = try await self.expand(
-          activeContext, value: val, property: property, insideList: insideList, loader: loader)
-        expandedProperties[expandedProperty] = .array(expandedSet.map(\.jsonValue))
+        try await self.expandSetKeyword(
+          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext,
+          property: property, insideList: insideList, loader: loader)
 
       case .graph?:
-        let expandedGraph = try await self.expand(
-          activeContext, value: val, property: "@graph", insideList: false, loader: loader)
-        expandedProperties[expandedProperty] = .array(expandedGraph.map(\.jsonValue))
+        try await self.expandGraphKeyword(
+          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext,
+          loader: loader)
 
       case .index?:
-        guard case .single(.iriOrTerm(let indexStr)) = val else { throw .code(.invalidIndexValue) }
-        expandedProperties[expandedProperty] = .string(indexStr)
+        try self.expandIndexKeyword(val, into: &expandedProperties, key: expandedProperty)
 
       case .reverse?:
-        let reverseObject: [String: SingleOrMany<JSONLDValue<Unresolved>>] =
-          switch val {
-          case .single(.unknown(let content)):
-            content
-          case .single(.node(let node)):
-            node.properties
-          default:
-            throw .code(.invalidReversePropertyMap)
-          }
-
-        if let expandedReverse = try await self.expandObject(
-          activeContext, object: reverseObject, property: "@reverse", insideList: false,
-          loader: loader),
-          case .node(let node) = expandedReverse
-        {
-          for (reverseKey, reverseValue) in node.jsonObject {
-            if reverseKey == JSONLDKeyword.reverse.rawValue {
-              guard case .object(let reverseMap) = reverseValue else {
-                throw .code(.invalidReversePropertyMap)
-              }
-
-              var mergedReverseMap: JSONObject =
-                if let existingReverse = expandedProperties[.reverse] {
-                  if case .object(let existingMap) = existingReverse {
-                    existingMap
-                  } else {
-                    throw .internalError(.notObject)
-                  }
-                } else {
-                  [:]
-                }
-
-              for (mapKey, mapValue) in reverseMap {
-                if let existing = mergedReverseMap[mapKey] {
-                  if case .array(var existingArray) = existing {
-                    if case .array(let newArray) = mapValue {
-                      existingArray.append(contentsOf: newArray)
-                    } else {
-                      existingArray.append(mapValue)
-                    }
-                    mergedReverseMap[mapKey] = .array(existingArray)
-                  } else {
-                    throw .internalError(.notObject)
-                  }
-                } else {
-                  mergedReverseMap[mapKey] = mapValue
-                }
-              }
-
-              expandedProperties[.reverse] = .object(mergedReverseMap)
-            } else {
-              self.mergeProperty(&expandedProperties, key: reverseKey, value: reverseValue)
-            }
-          }
-        } else {
-          throw .code(.invalidReversePropertyMap)
-        }
+        try await self.expandReverseKeyword(
+          val, into: &expandedProperties, activeContext: activeContext, loader: loader)
 
       case nil:
-        if !expandedProperty.contains(":") && !expandedProperty.hasPrefix("_:") {
-          continue
-        }
-
-        let container = activeContext.containerMapping(for: key)
-        let expandedValues: [JSONLDValue<Expanded>]
-
-        let isLanguageMap: Bool =
-          if container == .language {
-            switch val {
-            case .single(.unknown), .single(.node): true
-            default: false
-            }
-          } else {
-            false
-          }
-
-        let isIndexMap: Bool =
-          if container == .index {
-            switch val {
-            case .single(.unknown), .single(.node): true
-            default: false
-            }
-          } else {
-            false
-          }
-
-        if isLanguageMap {
-          let map: [String: SingleOrMany<JSONLDValue<Unresolved>>] =
-            switch val {
-            case .single(.unknown(let m)): m
-            case .single(.node(let node)): node.properties
-            default: [:]
-            }
-
-          var values: [JSONLDValue<Expanded>] = []
-          for (lang, langVal) in map.sorted(by: { $0.key < $1.key }) {
-            for item in langVal {
-              let json = item.jsonValue
-              guard case .string(let s) = json else {
-                throw .code(.invalidLanguageMapValue)
-              }
-              values.append(
-                try .value(
-                  .init(
-                    from: .object([
-                      "@value": .string(s),
-                      "@language": .string(lang.lowercased()),
-                    ]))))
-            }
-          }
-          expandedValues = values
-        } else if isIndexMap {
-          let map: [String: SingleOrMany<JSONLDValue<Unresolved>>] =
-            switch val {
-            case .single(.unknown(let m)):
-              m
-            case .single(.node(let node)):
-              node.properties
-            default:
-              [:]
-            }
-
-          var values: [JSONLDValue<Expanded>] = []
-          for (index, indexVal) in map.sorted(by: { $0.key < $1.key }) {
-            let expanded = try await self.expand(
-              activeContext, value: indexVal, property: key, insideList: insideList, loader: loader)
-
-            for item in expanded {
-              if case .object(var object) = item.jsonValue {
-                if object[.index] == nil {
-                  object[.index] = .string(index)
-                }
-                values.append(try .init(from: .object(object)))
-              } else {
-                values.append(item)
-              }
-            }
-          }
-          expandedValues = values
-        } else {
-          expandedValues = try await self.expand(
-            activeContext, value: val, property: key, insideList: insideList,
-            loader: loader)
-        }
-
-        let shouldIncludeProperty =
-          if expandedValues.isEmpty {
-            switch val {
-            case .many:
-              true
-            case .single(.setOrList):
-              true
-            default:
-              false
-            }
-          } else {
-            true
-          }
-
-        if shouldIncludeProperty {
-          if container == .list, case .many = val,
-            expandedValues.contains(where: {
-              if case .setOrList(.list) = $0 { true } else { false }
-            })
-          {
-            throw .code(.listOfLists)
-          }
-
-          if let termDef = activeContext.termDefinitions[key], termDef.reverse {
-            for v in expandedValues {
-              guard case .node = v else { throw .code(.invalidReversePropertyValue) }
-            }
-
-            if property != "@reverse" {
-              let newValues = expandedValues.map(\.jsonValue)
-              var reverseMap: JSONObject =
-                if let existingReverse = expandedProperties[.reverse] {
-                  if case .object(let existingMap) = existingReverse {
-                    existingMap
-                  } else {
-                    throw .internalError(.notObject)
-                  }
-                } else {
-                  [:]
-                }
-
-              if let existing = reverseMap[expandedProperty] {
-                if case .array(var arr) = existing {
-                  arr.append(contentsOf: newValues)
-                  reverseMap[expandedProperty] = .array(arr)
-                } else {
-                  throw .internalError(.notObject)
-                }
-              } else {
-                reverseMap[expandedProperty] = .array(newValues)
-              }
-
-              expandedProperties[.reverse] = .object(reverseMap)
-              continue
-            }
-          } else if property == "@reverse" {
-            let newValues = expandedValues.map(\.jsonValue)
-            var reverseMap: JSONObject =
-              if let existingReverse = expandedProperties[.reverse] {
-                if case .object(let existingMap) = existingReverse {
-                  existingMap
-                } else {
-                  throw .internalError(.notObject)
-                }
-              } else {
-                [:]
-              }
-
-            if let existing = reverseMap[expandedProperty] {
-              if case .array(var arr) = existing {
-                arr.append(contentsOf: newValues)
-                reverseMap[expandedProperty] = .array(arr)
-              } else {
-                throw .internalError(.notObject)
-              }
-            } else {
-              reverseMap[expandedProperty] = .array(newValues)
-            }
-
-            expandedProperties[.reverse] = .object(reverseMap)
-            continue
-          }
-
-          let finalValue: JSONValue =
-            if container == .list {
-              .array([
-                .object([
-                  "@list": .array(self.listItems(for: expandedValues))
-                ])
-              ])
-            } else {
-              .array(expandedValues.map(\.jsonValue))
-            }
-
-          if let existing = expandedProperties[expandedProperty] {
-            if case .array(var arr) = existing {
-              if case .array(let newArr) = finalValue {
-                arr.append(contentsOf: newArr)
-              } else {
-                arr.append(finalValue)
-              }
-              expandedProperties[expandedProperty] = .array(arr)
-            } else {
-              expandedProperties[expandedProperty] = .array([existing, finalValue])
-            }
-          } else {
-            expandedProperties[expandedProperty] = finalValue
-          }
-        }
+        try await self.expandTermProperty(
+          val, into: &expandedProperties, expandedProperty: expandedProperty, term: key,
+          activeContext: activeContext, property: property, insideList: insideList, loader: loader)
 
       default:
         continue
       }
     }
 
+    return try self.finalizeExpandedObject(
+      &expandedProperties, property: property, activeContext: activeContext)
+  }
+
+  private static func expandIdKeyword(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    key: String,
+    activeContext: ActiveContext
+  ) throws(JSONLDError) {
+    guard case .single(.iriOrTerm(let idStr)) = value else { throw .code(.invalidIdValue) }
+    let expandedId =
+      if self.shouldUseIRIExpansion(idStr, activeContext: activeContext) {
+        try activeContext.expandIRI(idStr, asDocumentRelative: true)
+      } else {
+        self.resolveDocumentRelativeIRI(idStr, baseIRI: activeContext.baseIRI)
+      }
+    properties[key] = .string(expandedId)
+  }
+
+  private static func expandTypeKeyword(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    key: String,
+    activeContext: ActiveContext
+  ) throws(JSONLDError) {
+    var expandedTypes: [JSONValue] = []
+    for item in value {
+      guard case .iriOrTerm(let s) = item else { throw .code(.invalidTypeValue) }
+      let expandedType = try activeContext.expandIRI(
+        s, asVocab: true, asDocumentRelative: true)
+      expandedTypes.append(.string(expandedType))
+    }
+    properties[key] = .array(expandedTypes)
+  }
+
+  private static func expandValueKeyword(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    key: String
+  ) throws(JSONLDError) {
+    let jsonValue = value.jsonValue
+    if case .object = jsonValue { throw .code(.invalidValueObjectValue) }
+    if case .array = jsonValue { throw .code(.invalidValueObjectValue) }
+    properties[key] = jsonValue
+  }
+
+  private static func expandLanguageKeyword(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    key: String
+  ) throws(JSONLDError) {
+    guard case .single(.iriOrTerm(let langStr)) = value else {
+      throw .code(.invalidLanguageTaggedString)
+    }
+    properties[key] = .string(langStr.lowercased())
+  }
+
+  private static func expandListKeyword(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    key: String,
+    activeContext: ActiveContext,
+    property: String?,
+    insideList: Bool,
+    loader: (any JSONLDDocumentLoader)?
+  ) async throws(JSONLDError) {
+    if insideList { throw .code(.listOfLists) }
+    let expandedList = try await self.expand(
+      activeContext, value: value, property: property, insideList: true, loader: loader)
+
+    for item in expandedList {
+      if case .setOrList(.list) = item {
+        throw .code(.listOfLists)
+      }
+    }
+    properties[key] = .array(expandedList.map(\.jsonValue))
+  }
+
+  private static func expandSetKeyword(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    key: String,
+    activeContext: ActiveContext,
+    property: String?,
+    insideList: Bool,
+    loader: (any JSONLDDocumentLoader)?
+  ) async throws(JSONLDError) {
+    let expandedSet = try await self.expand(
+      activeContext, value: value, property: property, insideList: insideList, loader: loader)
+    properties[key] = .array(expandedSet.map(\.jsonValue))
+  }
+
+  private static func expandGraphKeyword(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    key: String,
+    activeContext: ActiveContext,
+    loader: (any JSONLDDocumentLoader)?
+  ) async throws(JSONLDError) {
+    let expandedGraph = try await self.expand(
+      activeContext, value: value, property: "@graph", insideList: false, loader: loader)
+    properties[key] = .array(expandedGraph.map(\.jsonValue))
+  }
+
+  private static func expandIndexKeyword(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    key: String
+  ) throws(JSONLDError) {
+    guard case .single(.iriOrTerm(let indexStr)) = value else { throw .code(.invalidIndexValue) }
+    properties[key] = .string(indexStr)
+  }
+
+  private static func expandReverseKeyword(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    activeContext: ActiveContext,
+    loader: (any JSONLDDocumentLoader)?
+  ) async throws(JSONLDError) {
+    let reverseObject: [String: SingleOrMany<JSONLDValue<Unresolved>>] =
+      switch value {
+      case .single(.unknown(let content)):
+        content
+      case .single(.node(let node)):
+        node.properties
+      default:
+        throw .code(.invalidReversePropertyMap)
+      }
+
+    if let expandedReverse = try await self.expandObject(
+      activeContext, object: reverseObject, property: "@reverse", insideList: false,
+      loader: loader),
+      case .node(let node) = expandedReverse
+    {
+      for (reverseKey, reverseValue) in node.jsonObject {
+        if reverseKey == JSONLDKeyword.reverse.rawValue {
+          guard case .object(let reverseMap) = reverseValue else {
+            throw .code(.invalidReversePropertyMap)
+          }
+
+          var mergedReverseMap: JSONObject =
+            if let existingReverse = properties[.reverse] {
+              if case .object(let existingMap) = existingReverse {
+                existingMap
+              } else {
+                throw .internalError(.notObject)
+              }
+            } else {
+              [:]
+            }
+
+          for (mapKey, mapValue) in reverseMap {
+            if let existing = mergedReverseMap[mapKey] {
+              if case .array(var existingArray) = existing {
+                if case .array(let newArray) = mapValue {
+                  existingArray.append(contentsOf: newArray)
+                } else {
+                  existingArray.append(mapValue)
+                }
+                mergedReverseMap[mapKey] = .array(existingArray)
+              } else {
+                throw .internalError(.notObject)
+              }
+            } else {
+              mergedReverseMap[mapKey] = mapValue
+            }
+          }
+
+          properties[.reverse] = .object(mergedReverseMap)
+        } else {
+          self.mergeProperty(&properties, key: reverseKey, value: reverseValue)
+        }
+      }
+    } else {
+      throw .code(.invalidReversePropertyMap)
+    }
+  }
+
+  private static func expandTermProperty(
+    _ value: SingleOrMany<JSONLDValue<Unresolved>>,
+    into properties: inout JSONObject,
+    expandedProperty: String,
+    term: String,
+    activeContext: ActiveContext,
+    property: String?,
+    insideList: Bool,
+    loader: (any JSONLDDocumentLoader)?
+  ) async throws(JSONLDError) {
+    if !expandedProperty.contains(":") && !expandedProperty.hasPrefix("_:") {
+      return
+    }
+
+    let container = activeContext.containerMapping(for: term)
+    let expandedValues: [JSONLDValue<Expanded>]
+
+    let isLanguageMap =
+      if container == .language {
+        switch value {
+        case .single(.unknown), .single(.node): true
+        default: false
+        }
+      } else {
+        false
+      }
+
+    let isIndexMap =
+      if container == .index {
+        switch value {
+        case .single(.unknown), .single(.node): true
+        default: false
+        }
+      } else {
+        false
+      }
+
+    if isLanguageMap {
+      let map: [String: SingleOrMany<JSONLDValue<Unresolved>>] =
+        switch value {
+        case .single(.unknown(let m)): m
+        case .single(.node(let node)): node.properties
+        default: [:]
+        }
+
+      var values: [JSONLDValue<Expanded>] = []
+      for (lang, langVal) in map.sorted(by: { $0.key < $1.key }) {
+        for item in langVal {
+          let json = item.jsonValue
+          guard case .string(let s) = json else {
+            throw .code(.invalidLanguageMapValue)
+          }
+          values.append(
+            try .value(
+              .init(
+                from: .object([
+                  "@value": .string(s),
+                  "@language": .string(lang.lowercased()),
+                ]))))
+        }
+      }
+      expandedValues = values
+    } else if isIndexMap {
+      let map: [String: SingleOrMany<JSONLDValue<Unresolved>>] =
+        switch value {
+        case .single(.unknown(let m)):
+          m
+        case .single(.node(let node)):
+          node.properties
+        default:
+          [:]
+        }
+
+      var values: [JSONLDValue<Expanded>] = []
+      for (index, indexVal) in map.sorted(by: { $0.key < $1.key }) {
+        let expanded = try await self.expand(
+          activeContext, value: indexVal, property: term, insideList: insideList, loader: loader)
+
+        for item in expanded {
+          if case .object(var object) = item.jsonValue {
+            if object[.index] == nil {
+              object[.index] = .string(index)
+            }
+            values.append(try .init(from: .object(object)))
+          } else {
+            values.append(item)
+          }
+        }
+      }
+      expandedValues = values
+    } else {
+      expandedValues = try await self.expand(
+        activeContext, value: value, property: term, insideList: insideList,
+        loader: loader)
+    }
+
+    let shouldIncludeProperty =
+      if expandedValues.isEmpty {
+        switch value {
+        case .many:
+          true
+        case .single(.setOrList):
+          true
+        default:
+          false
+        }
+      } else {
+        true
+      }
+
+    if shouldIncludeProperty {
+      if container == .list, case .many = value,
+        expandedValues.contains(where: {
+          if case .setOrList(.list) = $0 { true } else { false }
+        })
+      {
+        throw .code(.listOfLists)
+      }
+
+      if let termDef = activeContext.termDefinitions[term], termDef.reverse {
+        for v in expandedValues {
+          guard case .node = v else { throw .code(.invalidReversePropertyValue) }
+        }
+
+        if property != "@reverse" {
+          let newValues = expandedValues.map(\.jsonValue)
+          var reverseMap: JSONObject =
+            if let existingReverse = properties[.reverse] {
+              if case .object(let existingMap) = existingReverse {
+                existingMap
+              } else {
+                throw .internalError(.notObject)
+              }
+            } else {
+              [:]
+            }
+
+          if let existing = reverseMap[expandedProperty] {
+            if case .array(var arr) = existing {
+              arr.append(contentsOf: newValues)
+              reverseMap[expandedProperty] = .array(arr)
+            } else {
+              throw .internalError(.notObject)
+            }
+          } else {
+            reverseMap[expandedProperty] = .array(newValues)
+          }
+
+          properties[.reverse] = .object(reverseMap)
+          return
+        }
+      } else if property == "@reverse" {
+        let newValues = expandedValues.map(\.jsonValue)
+        var reverseMap: JSONObject =
+          if let existingReverse = properties[.reverse] {
+            if case .object(let existingMap) = existingReverse {
+              existingMap
+            } else {
+              throw .internalError(.notObject)
+            }
+          } else {
+            [:]
+          }
+
+        if let existing = reverseMap[expandedProperty] {
+          if case .array(var arr) = existing {
+            arr.append(contentsOf: newValues)
+            reverseMap[expandedProperty] = .array(arr)
+          } else {
+            throw .internalError(.notObject)
+          }
+        } else {
+          reverseMap[expandedProperty] = .array(newValues)
+        }
+
+        properties[.reverse] = .object(reverseMap)
+        return
+      }
+
+      let finalValue: JSONValue =
+        if container == .list {
+          .array([
+            .object([
+              "@list": .array(self.listItems(for: expandedValues))
+            ])
+          ])
+        } else {
+          .array(expandedValues.map(\.jsonValue))
+        }
+
+      if let existing = properties[expandedProperty] {
+        if case .array(var arr) = existing {
+          if case .array(let newArr) = finalValue {
+            arr.append(contentsOf: newArr)
+          } else {
+            arr.append(finalValue)
+          }
+          properties[expandedProperty] = .array(arr)
+        } else {
+          properties[expandedProperty] = .array([existing, finalValue])
+        }
+      } else {
+        properties[expandedProperty] = finalValue
+      }
+    }
+  }
+
+  private static func finalizeExpandedObject(
+    _ expandedProperties: inout JSONObject,
+    property: String?,
+    activeContext: ActiveContext
+  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
     if let typeVal = expandedProperties[.type], case .array(let types) = typeVal, types.isEmpty {
       _ = expandedProperties.removeValue(for: .type)
     }

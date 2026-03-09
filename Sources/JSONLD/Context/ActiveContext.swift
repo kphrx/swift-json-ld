@@ -346,7 +346,7 @@ struct ActiveContext: Equatable, Sendable {
     return value
   }
 
-  mutating func expandIRI(
+  func expandIRI(
     _ value: String,
     asVocab: Bool = false,
     asDocumentRelative: Bool = false
