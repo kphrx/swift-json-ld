@@ -230,191 +230,246 @@ struct CompactionAlgorithm {
   private func compactNodeObject(_ object: JSONObject) throws(JSONLDError) -> JSONValue {
     var result: JSONObject = [:]
     for (expandedProperty, expandedValue) in object.sorted(by: { $0.key < $1.key }) {
-      if expandedProperty == JSONLDKeyword.id.rawValue {
-        let key = self.alias(for: expandedProperty)
-        if let id = Self.stringValue(expandedValue) {
-          result[key] = .string(self.compactIRI(id, vocab: false))
-        }
+      switch JSONLDKeyword(rawValue: expandedProperty) {
+      case .id?:
+        self.compactIdKeyword(expandedValue, into: &result, key: expandedProperty)
+
+      case .type?:
+        self.compactTypeKeyword(expandedValue, into: &result, key: expandedProperty)
+
+      case .index?:
+        self.compactIndexKeyword(expandedValue, into: &result, key: expandedProperty)
+
+      case .graph?:
+        try self.compactGraphKeyword(expandedValue, into: &result, key: expandedProperty)
+
+      case .reverse?:
+        try self.compactReverseKeyword(expandedValue, into: &result)
+
+      case nil:
+        try self.compactProperty(expandedValue, into: &result, expandedProperty: expandedProperty)
+
+      default:
         continue
-      }
-
-      if expandedProperty == JSONLDKeyword.type.rawValue {
-        let key = self.alias(for: expandedProperty)
-        if case .array(let types) = expandedValue {
-          let compactedTypes = types.compactMap(Self.stringValue).map {
-            self.compactIRI($0, vocab: true)
-          }
-          if self.options.compactArrays, compactedTypes.count == 1 {
-            result[key] = .string(compactedTypes[0])
-          } else {
-            result[key] = .array(compactedTypes.map(JSONValue.string))
-          }
-        }
-        continue
-      }
-
-      if expandedProperty == JSONLDKeyword.index.rawValue {
-        result[self.alias(for: expandedProperty)] = expandedValue
-        continue
-      }
-
-      if expandedProperty == JSONLDKeyword.graph.rawValue {
-        let key = self.alias(for: expandedProperty)
-        let values =
-          switch expandedValue {
-          case .array(let values): values
-          default: [expandedValue]
-          }
-        var compacted: [JSONValue] = []
-        compacted.reserveCapacity(values.count)
-        for value in values {
-          if let item = try self.compactElement(value, activeProperty: key) {
-            compacted.append(item)
-          }
-        }
-        result[key] = .array(compacted)
-        continue
-      }
-
-      if expandedProperty == JSONLDKeyword.reverse.rawValue {
-        guard case .object(let reverseObject) = expandedValue else {
-          throw .code(.invalidReversePropertyMap)
-        }
-        var compactedReverse: JSONObject = [:]
-        for (reverseProperty, reverseValue) in reverseObject {
-          guard case .array(let values) = reverseValue else { continue }
-          var groupedOriginal: [String: [JSONValue]] = [:]
-          var groupedCompacted: [String: [JSONValue]] = [:]
-          for item in values {
-            let term = self.selectTerm(
-              iri: reverseProperty,
-              value: .array([item]),
-              containerHint: nil,
-              reverse: true
-            )
-            groupedOriginal[term, default: []].append(item)
-            if let compacted = try self.compactElement(item, activeProperty: term) {
-              if compacted != .null {
-                groupedCompacted[term, default: []].append(compacted)
-              }
-            }
-          }
-          for term in groupedOriginal.keys.sorted() {
-            let originalValues = groupedOriginal[term] ?? []
-            let compactedValues = groupedCompacted[term] ?? []
-            let existingValues = Self.arrayValue(result[term])
-            let mergedValues = existingValues + compactedValues
-            if self.termDefs[term]?.reverse == true {
-              if self.termDefs[term]?.container == JSONLDKeyword.index.rawValue,
-                let indexMap = try self.compactIndexMap(originalValues, activeProperty: term)
-              {
-                result[term] = .object(indexMap)
-                continue
-              }
-              let compacted =
-                if self.options.compactArrays && mergedValues.count == 1
-                  && self.termDefs[term]?.container != JSONLDKeyword.set.rawValue
-                {
-                  mergedValues[0]
-                } else {
-                  JSONValue.array(mergedValues)
-                }
-              result[term] = compacted
-            } else {
-              let compacted =
-                if self.options.compactArrays && compactedValues.count == 1 {
-                  compactedValues[0]
-                } else {
-                  JSONValue.array(compactedValues)
-                }
-              if let existing = compactedReverse[term] {
-                compactedReverse[term] = .array(
-                  Self.arrayValue(existing) + Self.arrayValue(compacted))
-              } else {
-                compactedReverse[term] = compacted
-              }
-            }
-          }
-        }
-        if !compactedReverse.isEmpty {
-          result[self.alias(for: JSONLDKeyword.reverse.rawValue)] = .object(compactedReverse)
-        }
-        continue
-      }
-
-      let candidateTerms = self.iriToTerms[expandedProperty] ?? []
-      if candidateTerms.isEmpty && !Self.isAbsoluteIRI(expandedProperty) {
-        continue
-      }
-      let values: [JSONValue] =
-        switch expandedValue {
-        case .array(let values): values
-        default: [expandedValue]
-        }
-      if values.isEmpty {
-        let term = self.selectTerm(
-          iri: expandedProperty,
-          value: expandedValue,
-          containerHint: nil,
-          reverse: false
-        )
-        result[term] = .array([])
-        continue
-      }
-
-      var groupedOriginal: [String: [JSONValue]] = [:]
-      var groupedCompacted: [String: [JSONValue]] = [:]
-      for item in values {
-        let term = self.selectTerm(
-          iri: expandedProperty,
-          value: .array([item]),
-          containerHint: nil,
-          reverse: false
-        )
-        groupedOriginal[term, default: []].append(item)
-        if let compacted = try self.compactElement(item, activeProperty: term) {
-          if compacted != .null {
-            groupedCompacted[term, default: []].append(compacted)
-          }
-        }
-      }
-
-      for term in groupedOriginal.keys.sorted() {
-        let def = self.termDefs[term]
-        let originalValues = groupedOriginal[term] ?? []
-        let compactedValues = groupedCompacted[term] ?? []
-
-        if def?.container == JSONLDKeyword.index.rawValue,
-          let indexMap = try self.compactIndexMap(originalValues, activeProperty: term)
-        {
-          result[term] = .object(indexMap)
-          continue
-        }
-        if def?.container == JSONLDKeyword.language.rawValue,
-          let languageMap = self.compactLanguageMap(originalValues)
-        {
-          result[term] = .object(languageMap)
-          continue
-        }
-        if compactedValues.isEmpty, def?.container != JSONLDKeyword.set.rawValue,
-          def?.container != JSONLDKeyword.list.rawValue
-        {
-          if !originalValues.isEmpty {
-            continue
-          }
-        }
-        result[term] =
-          if self.options.compactArrays && compactedValues.count == 1
-            && def?.container != JSONLDKeyword.set.rawValue
-          {
-            compactedValues[0]
-          } else {
-            .array(compactedValues)
-          }
       }
     }
 
     return .object(result)
+  }
+
+  private func compactIdKeyword(
+    _ value: JSONValue,
+    into result: inout JSONObject,
+    key: String
+  ) {
+    let alias = self.alias(for: key)
+    if let id = Self.stringValue(value) {
+      result[alias] = .string(self.compactIRI(id, vocab: false))
+    }
+  }
+
+  private func compactTypeKeyword(
+    _ value: JSONValue,
+    into result: inout JSONObject,
+    key: String
+  ) {
+    let alias = self.alias(for: key)
+    if case .array(let types) = value {
+      let compactedTypes = types.compactMap(Self.stringValue).map {
+        self.compactIRI($0, vocab: true)
+      }
+      if self.options.compactArrays, compactedTypes.count == 1 {
+        result[alias] = .string(compactedTypes[0])
+      } else {
+        result[alias] = .array(compactedTypes.map(JSONValue.string))
+      }
+    }
+  }
+
+  private func compactIndexKeyword(
+    _ value: JSONValue,
+    into result: inout JSONObject,
+    key: String
+  ) {
+    result[self.alias(for: key)] = value
+  }
+
+  private func compactGraphKeyword(
+    _ value: JSONValue,
+    into result: inout JSONObject,
+    key: String
+  ) throws(JSONLDError) {
+    let alias = self.alias(for: key)
+    let values =
+      switch value {
+      case .array(let values): values
+      default: [value]
+      }
+    var compacted: [JSONValue] = []
+    compacted.reserveCapacity(values.count)
+    for v in values {
+      if let item = try self.compactElement(v, activeProperty: alias) {
+        compacted.append(item)
+      }
+    }
+    result[alias] = .array(compacted)
+  }
+
+  private func compactReverseKeyword(
+    _ value: JSONValue,
+    into result: inout JSONObject
+  ) throws(JSONLDError) {
+    guard case .object(let reverseObject) = value else {
+      throw .code(.invalidReversePropertyMap)
+    }
+    var compactedReverse: JSONObject = [:]
+    for (reverseProperty, reverseValue) in reverseObject {
+      guard case .array(let values) = reverseValue else { continue }
+
+      let grouped = try self.groupAndCompactValues(
+        iri: reverseProperty,
+        values: values,
+        reverse: true
+      )
+
+      for (term, group) in grouped.sorted(by: { $0.key < $1.key }) {
+        let compactedValues = group.compacted
+        let originalValues = group.original
+
+        if self.termDefs[term]?.reverse == true {
+          let def = self.termDefs[term]
+          let existingValues = Self.arrayValue(result[term])
+          let mergedValues = existingValues + compactedValues
+
+          if def?.container == JSONLDKeyword.index.rawValue,
+            let indexMap = try self.compactIndexMap(originalValues, activeProperty: term)
+          {
+            result[term] = .object(indexMap)
+            continue
+          }
+
+          result[term] =
+            if self.options.compactArrays && mergedValues.count == 1
+              && def?.container != JSONLDKeyword.set.rawValue
+            {
+              mergedValues[0]
+            } else {
+              .array(mergedValues)
+            }
+        } else {
+          let compacted =
+            if self.options.compactArrays && compactedValues.count == 1 {
+              compactedValues[0]
+            } else {
+              JSONValue.array(compactedValues)
+            }
+          if let existing = compactedReverse[term] {
+            compactedReverse[term] = .array(
+              Self.arrayValue(existing) + Self.arrayValue(compacted))
+          } else {
+            compactedReverse[term] = compacted
+          }
+        }
+      }
+    }
+    if !compactedReverse.isEmpty {
+      result[self.alias(for: JSONLDKeyword.reverse.rawValue)] = .object(compactedReverse)
+    }
+  }
+
+  private func compactProperty(
+    _ value: JSONValue,
+    into result: inout JSONObject,
+    expandedProperty: String
+  ) throws(JSONLDError) {
+    if (self.iriToTerms[expandedProperty] ?? []).isEmpty && !Self.isAbsoluteIRI(expandedProperty) {
+      return
+    }
+
+    let values: [JSONValue] =
+      switch value {
+      case .array(let values): values
+      default: [value]
+      }
+
+    if values.isEmpty {
+      let term = self.selectTerm(
+        iri: expandedProperty,
+        value: value,
+        containerHint: nil,
+        reverse: false
+      )
+      result[term] = .array([])
+      return
+    }
+
+    let grouped = try self.groupAndCompactValues(
+      iri: expandedProperty,
+      values: values,
+      reverse: false
+    )
+
+    for (term, group) in grouped.sorted(by: { $0.key < $1.key }) {
+      let def = self.termDefs[term]
+      let compactedValues = group.compacted
+      let originalValues = group.original
+
+      if def?.container == JSONLDKeyword.index.rawValue,
+        let indexMap = try self.compactIndexMap(originalValues, activeProperty: term)
+      {
+        result[term] = .object(indexMap)
+        continue
+      }
+      if def?.container == JSONLDKeyword.language.rawValue,
+        let languageMap = self.compactLanguageMap(originalValues)
+      {
+        result[term] = .object(languageMap)
+        continue
+      }
+
+      if compactedValues.isEmpty, def?.container != JSONLDKeyword.set.rawValue,
+        def?.container != JSONLDKeyword.list.rawValue
+      {
+        continue
+      }
+
+      result[term] =
+        if self.options.compactArrays && compactedValues.count == 1
+          && def?.container != JSONLDKeyword.set.rawValue
+        {
+          compactedValues[0]
+        } else {
+          .array(compactedValues)
+        }
+    }
+  }
+
+  private struct ValueGroup {
+    var original: [JSONValue] = []
+    var compacted: [JSONValue] = []
+  }
+
+  private func groupAndCompactValues(
+    iri: String,
+    values: [JSONValue],
+    reverse: Bool
+  ) throws(JSONLDError) -> [String: ValueGroup] {
+    var grouped: [String: ValueGroup] = [:]
+    for item in values {
+      let term = self.selectTerm(
+        iri: iri,
+        value: .array([item]),
+        containerHint: nil,
+        reverse: reverse
+      )
+      grouped[term, default: .init()].original.append(item)
+      if let compacted = try self.compactElement(item, activeProperty: term) {
+        if compacted != .null {
+          grouped[term, default: .init()].compacted.append(compacted)
+        }
+      }
+    }
+    return grouped
   }
 
   private func compactIndexMap(_ values: [JSONValue], activeProperty: String?) throws(JSONLDError)
