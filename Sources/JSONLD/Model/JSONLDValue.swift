@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
-  case node(NodeObject<P>)
-  case value(ValueObject<P>)
-  case setOrList(SetOrListObject<P>)
-  case languageMap(LanguageMap<P>)
-  case indexMap(IndexMap<P>)
+  case node(NodeObject)
+  case value(ValueObject)
+  case setOrList(SetOrListObject)
+  case languageMap(LanguageMap)
+  case indexMap(IndexMap)
   case iriOrTerm(String)
   case integer(Int)
   case float(Double)

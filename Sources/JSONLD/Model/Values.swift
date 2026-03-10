@@ -36,7 +36,7 @@ extension JSONLDValues: JSONLDValueProtocol where P == Unresolved {
 
 extension JSONLDValues where P == Expanded {
   public func asDocument(documentURL: String? = nil) -> JSONLDDocument<Expanded> {
-    let nodes = self.value.compactMap { value -> [NodeObject<Expanded>]? in
+    let nodes = self.value.compactMap { value -> [JSONLDValue<Expanded>.NodeObject]? in
       guard case .node(let node) = value else { return nil }
 
       if let graph = node.graph,

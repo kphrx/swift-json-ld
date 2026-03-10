@@ -11,9 +11,9 @@ public struct JSONLDDocument<P: JSONLDPhase>: Equatable, CustomJSONValueConverti
   public let documentURL: String?
 
   /// The top-level content of the document.
-  let value: SingleOrMany<NodeObject<P>>
+  let value: SingleOrMany<JSONLDValue<P>.NodeObject>
 
-  public init(_ value: SingleOrMany<NodeObject<P>>, documentURL: String? = nil) {
+  public init(_ value: SingleOrMany<JSONLDValue<P>.NodeObject>, documentURL: String? = nil) {
     self.value = value
     self.documentURL = documentURL
   }

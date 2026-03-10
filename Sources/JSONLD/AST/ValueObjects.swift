@@ -1,10 +1,32 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-enum ValueType: JSONLDValueProtocol, Equatable {
-  case iriOrTerm(String)
-  case null
+extension JSONLDValue {
+  public struct ValueObject: JSONLDObjectProtocol, Equatable {
+    let value: Value
+    let context: Contexts?
+    let type: ValueType?
+    let language: String?
+    let index: String?
+  }
+}
 
+extension JSONLDValue.ValueObject {
+  enum ValueType: JSONLDValueProtocol, Equatable {
+    case iriOrTerm(String)
+    case null
+  }
+
+  enum Value: JSONLDValueProtocol, Equatable {
+    case string(String)
+    case integer(Int)
+    case float(Double)
+    case boolean(Bool)
+    case null
+  }
+}
+
+extension JSONLDValue.ValueObject.ValueType {
   var jsonValue: JSONValue {
     switch self {
     case .iriOrTerm(let value): .string(value)
@@ -25,42 +47,31 @@ enum ValueType: JSONLDValueProtocol, Equatable {
   }
 }
 
-public struct ValueObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
-  enum Value: JSONLDValueProtocol, Equatable {
-    case string(String)
-    case integer(Int)
-    case float(Double)
-    case boolean(Bool)
-    case null
+extension JSONLDValue.ValueObject.Value {
+  var jsonValue: JSONValue {
+    switch self {
+    case .string(let value): .string(value)
+    case .integer(let value): .integer(value)
+    case .float(let value): .float(value)
+    case .boolean(let value): .boolean(value)
+    case .null: .null
+    }
+  }
 
-    var jsonValue: JSONValue {
-      switch self {
+  init(from jsonValue: JSONValue) throws(JSONLDError) {
+    self =
+      switch jsonValue {
       case .string(let value): .string(value)
       case .integer(let value): .integer(value)
       case .float(let value): .float(value)
       case .boolean(let value): .boolean(value)
       case .null: .null
+      default: throw .code(.invalidValueObjectValue)
       }
-    }
-
-    init(from jsonValue: JSONValue) throws(JSONLDError) {
-      self =
-        switch jsonValue {
-        case .string(let value): .string(value)
-        case .integer(let value): .integer(value)
-        case .float(let value): .float(value)
-        case .boolean(let value): .boolean(value)
-        case .null: .null
-        default: throw .code(.invalidValueObjectValue)
-        }
-    }
   }
-  let value: Value
-  let context: Contexts?
-  let type: ValueType?
-  let language: String?
-  let index: String?
+}
 
+extension JSONLDValue.ValueObject {
   public var jsonObject: JSONObject {
     var jsonObject: JSONObject = [:]
 

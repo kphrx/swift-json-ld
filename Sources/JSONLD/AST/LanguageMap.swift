@@ -1,10 +1,20 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public enum LanguageMapValue: JSONLDValueProtocol, Equatable {
-  case string(String)
-  case null
+extension JSONLDValue {
+  public struct LanguageMap: JSONLDObjectProtocol, Equatable {
+    let map: [String: SingleOrMany<Value>]
+  }
+}
 
+extension JSONLDValue.LanguageMap {
+  public enum Value: JSONLDValueProtocol, Equatable {
+    case string(String)
+    case null
+  }
+}
+
+extension JSONLDValue.LanguageMap.Value {
   public var jsonValue: JSONValue {
     switch self {
     case .string(let value): .string(value)
@@ -21,9 +31,7 @@ public enum LanguageMapValue: JSONLDValueProtocol, Equatable {
   }
 }
 
-public struct LanguageMap<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
-  let map: [String: SingleOrMany<LanguageMapValue>]
-
+extension JSONLDValue.LanguageMap {
   public var jsonObject: JSONObject {
     self.map.jsonObject
   }

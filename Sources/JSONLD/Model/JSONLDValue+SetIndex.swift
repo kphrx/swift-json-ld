@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension JSONLDValue {
-  init(_ value: SetValue<P>) {
+  init(_ value: SetOrListObject.Element) {
     self =
       switch value {
       case .string(let s): .iriOrTerm(s)
@@ -15,7 +15,7 @@ extension JSONLDValue {
       }
   }
 
-  init(_ value: IndexValue<P>) {
+  init(_ value: IndexMap.Value) {
     self =
       switch value {
       case .string(let s): .iriOrTerm(s)

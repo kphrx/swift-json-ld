@@ -210,7 +210,7 @@ enum ExpansionProcessor {
 
   private static func expandNode(
     _ activeContext: ActiveContext,
-    node: NodeObject<Unresolved>,
+    node: JSONLDValue<Unresolved>.NodeObject,
     property: String?,
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
@@ -243,7 +243,7 @@ enum ExpansionProcessor {
 
   private static func expandValue(
     _ activeContext: ActiveContext,
-    value: ValueObject<Unresolved>,
+    value: JSONLDValue<Unresolved>.ValueObject,
     property: String?,
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
@@ -257,7 +257,7 @@ enum ExpansionProcessor {
 
   private static func expandSetOrList(
     _ activeContext: ActiveContext,
-    setOrList: SetOrListObject<Unresolved>,
+    setOrList: JSONLDValue<Unresolved>.SetOrListObject,
     property: String?,
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
@@ -290,7 +290,7 @@ enum ExpansionProcessor {
 
   private static func expandLanguageMap(
     _ activeContext: ActiveContext,
-    languageMap: LanguageMap<Unresolved>
+    languageMap: JSONLDValue<Unresolved>.LanguageMap
   ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
     var expandedItems: [JSONLDValue<Expanded>] = []
     for (lang, values) in languageMap.map.sorted(by: { $0.key < $1.key }) {
@@ -308,7 +308,7 @@ enum ExpansionProcessor {
 
   private static func expandIndexMap(
     _ activeContext: ActiveContext,
-    indexMap: IndexMap<Unresolved>,
+    indexMap: JSONLDValue<Unresolved>.IndexMap,
     property: String?,
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
@@ -988,7 +988,7 @@ enum ExpansionProcessor {
 }
 
 extension JSONLDValue where P == Expanded {
-  fileprivate init(_ value: SetValue<Expanded>) {
+  fileprivate init(_ value: SetOrListObject.Element) {
     self =
       switch value {
       case .string(let s): .iriOrTerm(s)
@@ -1003,7 +1003,7 @@ extension JSONLDValue where P == Expanded {
 }
 
 extension JSONLDValue where P == Unresolved {
-  fileprivate init(_ value: SetValue<Unresolved>) {
+  fileprivate init(_ value: SetOrListObject.Element) {
     self =
       switch value {
       case .string(let s): .iriOrTerm(s)
@@ -1017,7 +1017,7 @@ extension JSONLDValue where P == Unresolved {
   }
 }
 
-extension SetValue where P == Expanded {
+extension JSONLDValue.SetOrListObject.Element where P == Expanded {
   fileprivate init(_ value: JSONLDValue<Expanded>) {
     self =
       switch value {

@@ -1,17 +1,28 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public enum SetValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
-  case string(String)
-  case integer(Int)
-  case float(Double)
-  case boolean(Bool)
-  case null
-  case nodeObject(NodeObject<P>)
-  case valueObject(ValueObject<P>)
+extension JSONLDValue {
+  public enum SetOrListObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
+    case set(SingleOrMany<Element>, context: Contexts?, index: String?)
+    case list(SingleOrMany<Element>, context: Contexts?, index: String?)
+  }
+}
 
-  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [SetValue<P>] {
-    try jsonArray.map(SetValue.init(from:))
+extension JSONLDValue.SetOrListObject {
+  public enum Element: JSONLDValueProtocol, Equatable {
+    case string(String)
+    case integer(Int)
+    case float(Double)
+    case boolean(Bool)
+    case null
+    case nodeObject(JSONLDValue.NodeObject)
+    case valueObject(JSONLDValue.ValueObject)
+  }
+}
+
+extension JSONLDValue.SetOrListObject.Element {
+  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [Self] {
+    try jsonArray.map(Self.init(from:))
   }
 
   public var jsonValue: JSONValue {
@@ -50,18 +61,15 @@ public enum SetValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
   }
 }
 
-public enum SetOrListObject<P: JSONLDPhase>: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
-  case set(SingleOrMany<SetValue<P>>, context: Contexts?, index: String?)
-  case list(SingleOrMany<SetValue<P>>, context: Contexts?, index: String?)
-
-  private var values: SingleOrMany<SetValue<P>> {
+extension JSONLDValue.SetOrListObject {
+  private var values: SingleOrMany<Element> {
     switch self {
     case .set(let values, _, _), .list(let values, _, _):
       values
     }
   }
 
-  var setOrListValues: SingleOrMany<SetValue<P>> {
+  var setOrListValues: SingleOrMany<Element> {
     self.values
   }
 

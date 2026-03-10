@@ -29,7 +29,7 @@ public enum Unresolved: JSONLDPhase {
 public enum Expanded: JSONLDPhase {
   // Directly define the associated type as an uninhabited enum.
   public enum UnknownContent: Equatable, Sendable {}
-  public typealias ReversePropertyValue = NodeObject<Expanded>
+  public typealias ReversePropertyValue = JSONLDValue<Expanded>.NodeObject
 
   public static func makeUnknown(from jsonObject: JSONObject) throws(JSONLDError) -> UnknownContent?
   {

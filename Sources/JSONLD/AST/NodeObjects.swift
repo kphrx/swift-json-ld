@@ -1,15 +1,19 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public struct NodeObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
-  let context: Contexts?
-  let id: String?
-  let graph: SingleOrMany<JSONLDValue<P>>?
-  let type: SingleOrMany<String>?
-  let reverse: ReversePropertyMap<P>?
-  let index: String?
-  let properties: [String: SingleOrMany<JSONLDValue<P>>]
+extension JSONLDValue {
+  public struct NodeObject: JSONLDObjectProtocol, Equatable {
+    let context: Contexts?
+    let id: String?
+    let graph: SingleOrMany<JSONLDValue<P>>?
+    let type: SingleOrMany<String>?
+    let reverse: ReversePropertyMap<P>?
+    let index: String?
+    let properties: [String: SingleOrMany<JSONLDValue<P>>]
+  }
+}
 
+extension JSONLDValue.NodeObject {
   public var jsonObject: JSONObject {
     var jsonObject = self.properties.jsonObject
 
@@ -65,7 +69,7 @@ public struct NodeObject<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
       case .object(let obj):
         return .single(try .init(from: .object(obj)))
       case .array(let arr):
-        let values = try arr.map(JSONLDValue<P>.init(from:))
+        let values = try arr.map(JSONLDValue.init(from:))
         return values.isEmpty ? nil : .many(values)
       case .null:
         return nil

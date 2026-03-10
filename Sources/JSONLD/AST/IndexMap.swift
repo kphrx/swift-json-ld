@@ -1,18 +1,28 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public enum IndexValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
-  case string(String)
-  case integer(Int)
-  case float(Double)
-  case boolean(Bool)
-  case null
-  case nodeObject(NodeObject<P>)
-  case valueObject(ValueObject<P>)
-  case setOrListObject(SetOrListObject<P>)
+extension JSONLDValue {
+  public struct IndexMap: JSONLDObjectProtocol, Equatable {
+    let map: [String: SingleOrMany<Value>]
+  }
+}
 
-  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [IndexValue<P>] {
-    try jsonArray.map(IndexValue.init(from:))
+extension JSONLDValue.IndexMap {
+  public enum Value: JSONLDValueProtocol, Equatable {
+    case string(String)
+    case integer(Int)
+    case float(Double)
+    case boolean(Bool)
+    case null
+    case nodeObject(JSONLDValue.NodeObject)
+    case valueObject(JSONLDValue.ValueObject)
+    case setOrListObject(JSONLDValue.SetOrListObject)
+  }
+}
+
+extension JSONLDValue.IndexMap.Value {
+  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [Self] {
+    try jsonArray.map(Self.init(from:))
   }
 
   public var jsonValue: JSONValue {
@@ -49,9 +59,7 @@ public enum IndexValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
   }
 }
 
-public struct IndexMap<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
-  let map: [String: SingleOrMany<IndexValue<P>>]
-
+extension JSONLDValue.IndexMap {
   public var jsonObject: JSONObject {
     self.map.jsonObject
   }
