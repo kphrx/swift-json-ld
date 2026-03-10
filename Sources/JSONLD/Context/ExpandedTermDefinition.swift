@@ -1,12 +1,16 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public enum TermDefinitionValue: JSONLDValueProtocol, Equatable, Sendable {
-  case null
-  case keyword(JSONLDKeyword)
-  case iriOrTerm(String)
-  case expanded(ExpandedTermDefinition)
+extension Contexts.ContextDefinition {
+  public enum Value: JSONLDValueProtocol, Equatable, Sendable {
+    case null
+    case keyword(JSONLDKeyword)
+    case iriOrTerm(String)
+    case expanded(ExpandedTermDefinition)
+  }
+}
 
+extension Contexts.ContextDefinition.Value {
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -35,10 +39,14 @@ public enum TermDefinitionValue: JSONLDValueProtocol, Equatable, Sendable {
   }
 }
 
-public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
-  case standard(Standard)
-  case reverse(Reverse)
+extension Contexts.ContextDefinition {
+  public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
+    case standard(Standard)
+    case reverse(Reverse)
+  }
+}
 
+extension Contexts.ContextDefinition.ExpandedTermDefinition {
   public var jsonObject: JSONObject {
     switch self {
     case .standard(let standard): standard.jsonObject
@@ -49,11 +57,11 @@ public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
 
-    let id = try properties.removeValue(for: .id).map(TermDefinitionId.init)
-    let type = try properties.removeValue(for: .type).map(TermDefinitionType.init)
-    let language = try properties.removeValue(for: .language).map(TermDefinitionLanguage.init)
+    let id = try properties.removeValue(for: .id).map(Id.init)
+    let type = try properties.removeValue(for: .type).map(TermType.init)
+    let language = try properties.removeValue(for: .language).map(Language.init)
     let container = try properties.removeValue(for: .container).map(Container.init)
-    let reverse = try properties.removeValue(for: .reverse).map(TermDefinitionReverse.init)
+    let reverse = try properties.removeValue(for: .reverse).map(ReverseProperty.init)
     let context = try properties.removeValue(for: .context).map(Contexts.init(from:))
     let index = properties.removeValue(for: .index)
     let nest = properties.removeValue(for: .nest)
@@ -100,11 +108,11 @@ public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
   }
 }
 
-extension ExpandedTermDefinition {
+extension Contexts.ContextDefinition.ExpandedTermDefinition {
   public struct Standard: Equatable, Sendable {
-    let id: TermDefinitionId?
-    let type: TermDefinitionType?
-    let language: TermDefinitionLanguage?
+    let id: Id?
+    let type: TermType?
+    let language: Language?
     let container: Container?
     let context: Contexts?
     let index: JSONValue?
@@ -156,9 +164,9 @@ extension ExpandedTermDefinition {
   }
 
   public struct Reverse: Equatable, Sendable {
-    let reverse: TermDefinitionReverse
-    let type: TermDefinitionType?
-    let language: TermDefinitionLanguage?
+    let reverse: ReverseProperty
+    let type: TermType?
+    let language: Language?
     let container: Container?
     let context: Contexts?
     let index: JSONValue?
@@ -256,15 +264,18 @@ extension ExpandedTermDefinition {
         throw .code(.invalidContainerMapping)
       }
     }
-
   }
 }
 
-public enum TermDefinitionId: JSONLDValueProtocol, Equatable, Sendable {
-  case null
-  case keyword(JSONLDKeyword)
-  case iriOrTerm(String)
+extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  public enum Id: JSONLDValueProtocol, Equatable, Sendable {
+    case null
+    case keyword(JSONLDKeyword)
+    case iriOrTerm(String)
+  }
+}
 
+extension Contexts.ContextDefinition.ExpandedTermDefinition.Id {
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -290,7 +301,7 @@ public enum TermDefinitionId: JSONLDValueProtocol, Equatable, Sendable {
   }
 }
 
-extension ExpandedTermDefinition.Reverse {
+extension Contexts.ContextDefinition.ExpandedTermDefinition.Reverse {
   public enum Container: Equatable, Sendable {
     case null
     case set
@@ -311,7 +322,9 @@ extension ExpandedTermDefinition.Reverse {
       self.keyword?.jsonValue ?? .null
     }
 
-    init(from container: ExpandedTermDefinition.Container) throws(JSONLDError) {
+    init(from container: Contexts.ContextDefinition.ExpandedTermDefinition.Container)
+      throws(JSONLDError)
+    {
       switch container {
       case .null:
         self = .null
@@ -324,11 +337,15 @@ extension ExpandedTermDefinition.Reverse {
   }
 }
 
-public enum TermDefinitionType: JSONLDValueProtocol, Equatable, Sendable {
-  case null
-  case keyword(JSONLDKeyword)
-  case iriOrTerm(String)
+extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  public enum TermType: JSONLDValueProtocol, Equatable, Sendable {
+    case null
+    case keyword(JSONLDKeyword)
+    case iriOrTerm(String)
+  }
+}
 
+extension Contexts.ContextDefinition.ExpandedTermDefinition.TermType {
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -358,10 +375,14 @@ public enum TermDefinitionType: JSONLDValueProtocol, Equatable, Sendable {
   }
 }
 
-public enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable, Sendable {
-  case null
-  case string(String)
+extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  public enum Language: JSONLDValueProtocol, Equatable, Sendable {
+    case null
+    case string(String)
+  }
+}
 
+extension Contexts.ContextDefinition.ExpandedTermDefinition.Language {
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -382,10 +403,14 @@ public enum TermDefinitionLanguage: JSONLDValueProtocol, Equatable, Sendable {
   }
 }
 
-public enum TermDefinitionReverse: JSONLDValueProtocol, Equatable, Sendable {
-  case null
-  case string(String)
+extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  public enum ReverseProperty: JSONLDValueProtocol, Equatable, Sendable {
+    case null
+    case string(String)
+  }
+}
 
+extension Contexts.ContextDefinition.ExpandedTermDefinition.ReverseProperty {
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null

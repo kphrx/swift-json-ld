@@ -41,7 +41,7 @@ struct ContextResolver {
   }
 
   private func process(
-    context: Context,
+    context: Contexts.Value,
     activeContext: inout ActiveContext,
     remoteContexts: [String]
   ) async throws(JSONLDError) {
@@ -101,7 +101,9 @@ struct ContextResolver {
     }
   }
 
-  private func apply(contextDefinition: ContextDefinition, to activeContext: inout ActiveContext)
+  private func apply(
+    contextDefinition: Contexts.ContextDefinition, to activeContext: inout ActiveContext
+  )
     throws(JSONLDError)
   {
     try activeContext.applyBaseIRI(contextDefinition.baseIRI)

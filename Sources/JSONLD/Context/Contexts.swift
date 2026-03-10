@@ -3,9 +3,11 @@
 
 public enum Contexts: JSONLDValueProtocol, Equatable, Sendable {
   case null
-  case single(Context)
-  case array([Context])
+  case single(Value)
+  case array([Value])
+}
 
+extension Contexts {
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -19,7 +21,7 @@ public enum Contexts: JSONLDValueProtocol, Equatable, Sendable {
       if case .null = jsonValue {
         .null
       } else {
-        switch try SingleOrMany<Context>(from: jsonValue) {
+        switch try SingleOrMany<Value>(from: jsonValue) {
         case .single(let context): .single(context)
         case .many(let contexts): .array(contexts)
         }
@@ -34,11 +36,15 @@ extension Contexts: Decodable {
   }
 }
 
-public enum Context: JSONLDValueProtocol, Equatable, Sendable {
-  case absoluteIRI(String)
-  case relativeIRI(String)
-  case contextDefinition(ContextDefinition)
+extension Contexts {
+  public enum Value: JSONLDValueProtocol, Equatable, Sendable {
+    case absoluteIRI(String)
+    case relativeIRI(String)
+    case contextDefinition(ContextDefinition)
+  }
+}
 
+extension Contexts.Value {
   public var jsonValue: JSONValue {
     switch self {
     case .absoluteIRI(let value), .relativeIRI(let value): .string(value)

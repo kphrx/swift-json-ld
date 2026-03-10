@@ -1,12 +1,16 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-public struct ContextDefinition: JSONLDObjectProtocol, Equatable, Sendable {
-  let baseIRI: BaseIRI?
-  let vocabMapping: VocabMapping?
-  let defaultLanguage: DefaultLanguage?
-  let terms: [String: TermDefinitionValue]
+extension Contexts {
+  public struct ContextDefinition: JSONLDObjectProtocol, Equatable, Sendable {
+    let baseIRI: BaseIRI?
+    let vocabMapping: VocabMapping?
+    let defaultLanguage: DefaultLanguage?
+    let terms: [String: Value]
+  }
+}
 
+extension Contexts.ContextDefinition {
   public var jsonObject: JSONObject {
     var jsonObject = self.terms.jsonObject
 
@@ -49,13 +53,13 @@ public struct ContextDefinition: JSONLDObjectProtocol, Equatable, Sendable {
         if JSONLDKeyword(rawValue: key) != nil {
           throw .code(.keywordRedefinition)
         }
-        return (key, try TermDefinitionValue(from: value))
+        return (key, try Value(from: value))
       }
     )
   }
 }
 
-extension ContextDefinition {
+extension Contexts.ContextDefinition {
   enum BaseIRI: JSONLDValueProtocol, Equatable, Sendable {
     case null
     case string(String)

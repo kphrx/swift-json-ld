@@ -51,7 +51,7 @@ struct ActiveContext: Equatable, Sendable {
     )
   }
 
-  mutating func applyBaseIRI(_ baseIRI: ContextDefinition.BaseIRI?) throws(JSONLDError) {
+  mutating func applyBaseIRI(_ baseIRI: Contexts.ContextDefinition.BaseIRI?) throws(JSONLDError) {
     guard let baseIRI else { return }
     switch baseIRI {
     case .string(let value):
@@ -68,7 +68,7 @@ struct ActiveContext: Equatable, Sendable {
   }
 
   mutating func applyVocabMapping(
-    _ vocabMapping: ContextDefinition.VocabMapping?,
+    _ vocabMapping: Contexts.ContextDefinition.VocabMapping?,
     allowEmptyMapping: Bool = false,
     allowRelativeMapping: Bool = false
   ) throws(JSONLDError) {
@@ -90,7 +90,8 @@ struct ActiveContext: Equatable, Sendable {
     }
   }
 
-  mutating func applyDefaultLanguage(_ defaultLanguage: ContextDefinition.DefaultLanguage?) {
+  mutating func applyDefaultLanguage(_ defaultLanguage: Contexts.ContextDefinition.DefaultLanguage?)
+  {
     guard let defaultLanguage else { return }
     switch defaultLanguage {
     case .string(let value):
@@ -100,7 +101,7 @@ struct ActiveContext: Equatable, Sendable {
     }
   }
 
-  mutating func applyTerms(from definition: ContextDefinition) throws(JSONLDError) {
+  mutating func applyTerms(from definition: Contexts.ContextDefinition) throws(JSONLDError) {
     var defined: [String: Bool] = [:]
     for term in definition.terms.keys.sorted() {
       try self.defineTerm(definition, term: term, defined: &defined)
@@ -108,7 +109,7 @@ struct ActiveContext: Equatable, Sendable {
   }
 
   private mutating func defineTerm(
-    _ definition: ContextDefinition,
+    _ definition: Contexts.ContextDefinition,
     term: String,
     defined: inout [String: Bool]
   ) throws(JSONLDError) {
@@ -295,7 +296,7 @@ struct ActiveContext: Equatable, Sendable {
   private mutating func expandIRIForDefinition(
     _ value: String,
     asVocab: Bool,
-    definition: ContextDefinition,
+    definition: Contexts.ContextDefinition,
     term: String,
     defined: inout [String: Bool]
   ) throws(JSONLDError) -> String {
@@ -452,47 +453,51 @@ struct ActiveContext: Equatable, Sendable {
     self.termDefinitions[term]?.languageMappingDefined ?? false
   }
 
-  func containerMapping(for term: String) -> ExpandedTermDefinition.Container {
+  func containerMapping(for term: String)
+    -> Contexts.ContextDefinition.ExpandedTermDefinition.Container
+  {
     self.termDefinitions[term]?.containerMapping ?? .null
   }
 }
 
-struct TermDefinition: Equatable, Sendable {
-  var iri: String
-  var reverse: Bool
-  var typeMapping: String?
-  var languageMapping: String?
-  var languageMappingDefined: Bool
-  var containerMapping: ExpandedTermDefinition.Container
-  var localContext: Contexts?
-  var index: JSONValue?
-  var nest: JSONValue?
-  var prefix: JSONValue?
-  var protected: JSONValue?
+extension ActiveContext {
+  struct TermDefinition: Equatable, Sendable {
+    var iri: String
+    var reverse: Bool
+    var typeMapping: String?
+    var languageMapping: String?
+    var languageMappingDefined: Bool
+    var containerMapping: Contexts.ContextDefinition.ExpandedTermDefinition.Container
+    var localContext: Contexts?
+    var index: JSONValue?
+    var nest: JSONValue?
+    var prefix: JSONValue?
+    var protected: JSONValue?
 
-  init(
-    iri: String,
-    reverse: Bool = false,
-    typeMapping: String? = nil,
-    languageMapping: String? = nil,
-    languageMappingDefined: Bool = false,
-    containerMapping: ExpandedTermDefinition.Container = .null,
-    localContext: Contexts? = nil,
-    index: JSONValue? = nil,
-    nest: JSONValue? = nil,
-    prefix: JSONValue? = nil,
-    protected: JSONValue? = nil
-  ) {
-    self.iri = iri
-    self.reverse = reverse
-    self.typeMapping = typeMapping
-    self.languageMapping = languageMapping
-    self.languageMappingDefined = languageMappingDefined
-    self.containerMapping = containerMapping
-    self.localContext = localContext
-    self.index = index
-    self.nest = nest
-    self.prefix = prefix
-    self.protected = protected
+    init(
+      iri: String,
+      reverse: Bool = false,
+      typeMapping: String? = nil,
+      languageMapping: String? = nil,
+      languageMappingDefined: Bool = false,
+      containerMapping: Contexts.ContextDefinition.ExpandedTermDefinition.Container = .null,
+      localContext: Contexts? = nil,
+      index: JSONValue? = nil,
+      nest: JSONValue? = nil,
+      prefix: JSONValue? = nil,
+      protected: JSONValue? = nil
+    ) {
+      self.iri = iri
+      self.reverse = reverse
+      self.typeMapping = typeMapping
+      self.languageMapping = languageMapping
+      self.languageMappingDefined = languageMappingDefined
+      self.containerMapping = containerMapping
+      self.localContext = localContext
+      self.index = index
+      self.nest = nest
+      self.prefix = prefix
+      self.protected = protected
+    }
   }
 }
