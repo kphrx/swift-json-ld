@@ -36,6 +36,9 @@ let package = Package(
       dependencies: ["JSONCodable"]),
     .testTarget(
       name: "JSONLDTests",
+      dependencies: ["JSONLD"]),
+    .testTarget(
+      name: "JSONLDTestSuiteTests",
       dependencies: ["JSONLD"],
       resources: [
         .copy("Resources/Fixtures/")
