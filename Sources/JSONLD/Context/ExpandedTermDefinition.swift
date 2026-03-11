@@ -39,6 +39,55 @@ extension Contexts.ContextDefinition.Value {
   }
 }
 
+extension Contexts.ContextDefinition.Value: ExpressibleByNilLiteral {
+  public init(nilLiteral: ()) {
+    self = .null
+  }
+}
+
+extension Contexts.ContextDefinition.Value: ExpressibleByStringLiteral {
+  public init(stringLiteral value: String) {
+    if let keyword = JSONLDKeyword(rawValue: value) {
+      self = .keyword(keyword)
+    } else {
+      self = .iriOrTerm(value)
+    }
+  }
+}
+
+extension Contexts.ContextDefinition.Value: ExpressibleByDictionaryLiteral {
+  public init(
+    dictionaryLiteral elements: (String, String?)...
+  ) {
+    self = .expanded(.fromLiteral(elements))
+  }
+}
+
+extension Contexts.ContextDefinition.ExpandedTermDefinition: ExpressibleByDictionaryLiteral {
+  public init(dictionaryLiteral elements: (String, String?)...) {
+    self = .fromLiteral(elements)
+  }
+}
+
+extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  fileprivate static func fromLiteral(_ elements: [(String, String?)]) -> Self {
+    do {
+      return try .init(
+        from: .init(
+          uniqueKeysWithValues: elements.map { key, value in
+            guard JSONLDKeyword(rawValue: key) != nil else {
+              preconditionFailure("Invalid term definition literal: unknown keyword \(key)")
+            }
+            return (key, value.map(JSONValue.string) ?? .null)
+          }
+        )
+      )
+    } catch {
+      preconditionFailure("Invalid term definition literal: \(error)")
+    }
+  }
+}
+
 extension Contexts.ContextDefinition {
   public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
     case standard(Standard)

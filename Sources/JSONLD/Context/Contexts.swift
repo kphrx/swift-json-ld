@@ -3,8 +3,8 @@
 
 public enum Contexts: JSONLDValueProtocol, Equatable, Sendable {
   case null
-  case single(Value)
-  case array([Value])
+  case single(Element)
+  case array([Element])
 }
 
 extension Contexts {
@@ -21,7 +21,7 @@ extension Contexts {
       if case .null = jsonValue {
         .null
       } else {
-        switch try SingleOrMany<Value>(from: jsonValue) {
+        switch try SingleOrMany<Element>(from: jsonValue) {
         case .single(let context): .single(context)
         case .many(let contexts): .array(contexts)
         }
@@ -36,15 +36,59 @@ extension Contexts: Decodable {
   }
 }
 
+extension Contexts: ExpressibleByNilLiteral {
+  public init(nilLiteral: ()) {
+    self = .null
+  }
+}
+
+extension Contexts: ExpressibleByStringLiteral {
+  public init(stringLiteral value: String) {
+    do {
+      self = .single(try .init(iri: value))
+    } catch {
+      preconditionFailure("Invalid @context literal: \(error)")
+    }
+  }
+}
+
+extension Contexts: ExpressibleByArrayLiteral {
+  public init(arrayLiteral elements: Contexts.Element...) {
+    self = .array(elements)
+  }
+}
+
+extension Contexts: ExpressibleByDictionaryLiteral {
+  public init(dictionaryLiteral elements: (String, Contexts.ContextDefinition.Value)...) {
+    self = .single(.fromLiteral(elements))
+  }
+}
+
 extension Contexts {
-  public enum Value: JSONLDValueProtocol, Equatable, Sendable {
+  public enum Element: JSONLDValueProtocol, Equatable, Sendable {
     case absoluteIRI(String)
     case relativeIRI(String)
     case contextDefinition(ContextDefinition)
   }
 }
 
-extension Contexts.Value {
+extension Contexts.Element: ExpressibleByStringLiteral {
+  public init(stringLiteral value: String) {
+    do {
+      try self.init(iri: value)
+    } catch {
+      preconditionFailure("Invalid @context literal: \(error)")
+    }
+  }
+}
+
+extension Contexts.Element: ExpressibleByDictionaryLiteral {
+  public init(dictionaryLiteral elements: (String, Contexts.ContextDefinition.Value)...) {
+    self = .fromLiteral(elements)
+  }
+}
+
+extension Contexts.Element {
   public var jsonValue: JSONValue {
     switch self {
     case .absoluteIRI(let value), .relativeIRI(let value): .string(value)
@@ -72,5 +116,19 @@ extension Contexts.Value {
       case .string(let value): try .init(iri: value)
       default: throw .code(.invalidLocalContext)
       }
+  }
+
+  fileprivate static func fromLiteral(_ elements: [(String, Contexts.ContextDefinition.Value)])
+    -> Self
+  {
+    var jsonObject: JSONObject = [:]
+    for (key, value) in elements {
+      jsonObject[key] = value.jsonValue
+    }
+    do {
+      return .contextDefinition(try .init(from: jsonObject))
+    } catch {
+      preconditionFailure("Invalid @context literal: \\(error)")
+    }
   }
 }

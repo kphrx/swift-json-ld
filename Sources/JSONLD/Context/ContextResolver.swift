@@ -41,7 +41,7 @@ struct ContextResolver {
   }
 
   private func process(
-    context: Contexts.Value,
+    context: Contexts.Element,
     activeContext: inout ActiveContext,
     remoteContexts: [String]
   ) async throws(JSONLDError) {
