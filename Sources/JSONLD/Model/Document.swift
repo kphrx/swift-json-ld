@@ -13,11 +13,13 @@ public struct JSONLDDocument<P: JSONLDPhase>: Equatable, CustomJSONValueConverti
   /// The top-level content of the document.
   let value: SingleOrMany<JSONLDValue<P>.NodeObject>
 
+  /// Creates a JSON-LD document from node objects.
   public init(_ value: SingleOrMany<JSONLDValue<P>.NodeObject>, documentURL: String? = nil) {
     self.value = value
     self.documentURL = documentURL
   }
 
+  /// Returns this document as a JSON value.
   public var jsonValue: JSONValue {
     self.value.jsonValue
   }
@@ -26,6 +28,7 @@ public struct JSONLDDocument<P: JSONLDPhase>: Equatable, CustomJSONValueConverti
     self.init(try .init(from: jsonValue))
   }
 
+  /// Returns this document as a collection of JSON-LD values.
   public var values: JSONLDValues<P> {
     .init(.many(self.value.map(JSONLDValue<P>.node)))
   }
@@ -43,12 +46,14 @@ extension JSONLDDocument: Decodable where P == Unresolved {
 }
 
 extension JSONLDDocument: JSONLDValueProtocol where P == Unresolved {
+  /// Creates an unresolved document from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     try self.init(validating: jsonValue)
   }
 }
 
 extension JSONLDDocument where P == Expanded {
+  /// Normalizes expanded values into a JSON-LD document.
   public init(normalizing values: JSONLDValues<Expanded>, documentURL: String? = nil) {
     self = values.asDocument(documentURL: documentURL)
   }

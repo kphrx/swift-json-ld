@@ -11,6 +11,7 @@ public class JSONLDProcessor {
   /// The loader used to resolve remote documents and contexts.
   public var loader: any JSONLDDocumentLoader = DefaultLoader()
 
+  /// Creates a JSON-LD processor.
   public init() {}
 
   /// Expands the specified JSON-LD document.

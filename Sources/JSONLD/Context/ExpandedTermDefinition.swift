@@ -300,6 +300,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
       }
     }
 
+    /// Returns this container mapping as a JSON value.
     public var jsonValue: JSONValue {
       self.keyword?.jsonValue ?? .null
     }

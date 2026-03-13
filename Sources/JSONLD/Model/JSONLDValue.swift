@@ -1,6 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
+/// A JSON-LD value that is parameterized by processing phase.
 public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
   case node(NodeObject)
   case value(ValueObject)
@@ -15,11 +16,13 @@ public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
   case unknown(P.UnknownContent)
   case invalid(InvalidValue)
 
+  /// A JSON-LD value that is structurally invalid in the current phase.
   public enum InvalidValue: Equatable {
     case listOfLists
     case notJSONLDValue
   }
 
+  /// Returns this value as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
     case .node(let nodeObject): nodeObject.jsonValue
@@ -42,6 +45,7 @@ public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
     }
   }
 
+  /// Creates a JSON-LD value from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
     case .string(let string):

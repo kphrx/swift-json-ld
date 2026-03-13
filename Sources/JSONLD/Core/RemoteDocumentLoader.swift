@@ -28,6 +28,7 @@ public struct RemoteDocument: Sendable {
   /// `http://www.w3.org/ns/json-ld#context` relation.
   public let contextURL: String?
 
+  /// Creates a remote document with metadata.
   public init(
     documentURL: String,
     document: JSONValue,

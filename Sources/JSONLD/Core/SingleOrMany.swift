@@ -1,6 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
+/// A JSON-LD value that can be either a single item or an array of items.
 public indirect enum SingleOrMany<T: Equatable>: Equatable {
   typealias Mapper = (JSONValue) throws(JSONLDError) -> T
 
@@ -33,6 +34,7 @@ public indirect enum SingleOrMany<T: Equatable>: Equatable {
 }
 
 extension SingleOrMany: CustomJSONValueConvertible where T: CustomJSONValueConvertible {
+  /// Returns this value as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
     case .single(let value): value.jsonValue
@@ -46,12 +48,14 @@ extension SingleOrMany: JSONLDValueProtocol where T: JSONLDValueProtocol {
     try self.init(from: jsonArray, mapper: T.init(from:))
   }
 
+  /// Creates a single or many value from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     try self.init(from: jsonValue, mapper: T.init(from:))
   }
 }
 
 extension SingleOrMany: Sequence {
+  /// Returns an iterator over the elements.
   public func makeIterator() -> AnyIterator<T> {
     switch self {
     case .single(let value): .init([value].makeIterator())

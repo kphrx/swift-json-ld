@@ -9,6 +9,7 @@ public struct JSONLDValues<P: JSONLDPhase>: Equatable, CustomJSONValueConvertibl
     self.value = value
   }
 
+  /// Returns these values as a JSON value.
   public var jsonValue: JSONValue {
     self.value.jsonValue
   }
@@ -29,12 +30,14 @@ extension JSONLDValues: Decodable where P == Unresolved {
 }
 
 extension JSONLDValues: JSONLDValueProtocol where P == Unresolved {
+  /// Creates unresolved values from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     try self.init(validating: jsonValue)
   }
 }
 
 extension JSONLDValues where P == Expanded {
+  /// Normalizes expanded values into a JSON-LD document.
   public func asDocument(documentURL: String? = nil) -> JSONLDDocument<Expanded> {
     let nodes = self.value.compactMap { value -> [JSONLDValue<Expanded>.NodeObject]? in
       guard case .node(let node) = value else { return nil }

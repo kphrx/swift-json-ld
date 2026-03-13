@@ -1,6 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
+/// A JSON-LD keyword.
 public enum JSONLDKeyword: String, CaseIterable, JSONLDValueProtocol, Sendable {
   case base = "@base"
   case container = "@container"
@@ -26,10 +27,12 @@ public enum JSONLDKeyword: String, CaseIterable, JSONLDValueProtocol, Sendable {
   case version = "@version"
   case vocab = "@vocab"
 
+  /// Returns this keyword as a JSON value.
   public var jsonValue: JSONValue {
     .string(self.rawValue)
   }
 
+  /// Creates a keyword from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     guard case .string(let value) = jsonValue,
       let keyword = JSONLDKeyword(rawValue: value)
