@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension Contexts {
+  /// A JSON-LD *context definition* object.
   public struct ContextDefinition: JSONLDObjectProtocol, Equatable, Sendable {
     let baseIRI: BaseIRI?
     let vocabMapping: VocabMapping?
@@ -11,6 +12,7 @@ extension Contexts {
 }
 
 extension Contexts.ContextDefinition {
+  /// Returns this *context definition* as a JSON object.
   public var jsonObject: JSONObject {
     var jsonObject = self.terms.jsonObject
 
@@ -29,6 +31,7 @@ extension Contexts.ContextDefinition {
     return jsonObject
   }
 
+  /// Creates a *context definition* from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     if properties.removeValue(for: .version) != nil {

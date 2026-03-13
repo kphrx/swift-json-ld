@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension JSONLDValue {
+  /// An *index map* object in JSON-LD.
   public struct IndexMap: JSONLDObjectProtocol, Equatable {
     let map: [String: SingleOrMany<Value>]
   }
 }
 
 extension JSONLDValue.IndexMap {
+  /// A value inside an *index map*.
   public enum Value: JSONLDValueProtocol, Equatable {
     case string(String)
     case integer(Int)
@@ -25,6 +27,7 @@ extension JSONLDValue.IndexMap.Value {
     try jsonArray.map(Self.init(from:))
   }
 
+  /// Returns this index map value as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
     case .string(let value): .string(value)
@@ -38,6 +41,7 @@ extension JSONLDValue.IndexMap.Value {
     }
   }
 
+  /// Creates an index map value from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
@@ -60,10 +64,12 @@ extension JSONLDValue.IndexMap.Value {
 }
 
 extension JSONLDValue.IndexMap {
+  /// Returns this index map as a JSON object.
   public var jsonObject: JSONObject {
     self.map.jsonObject
   }
 
+  /// Creates an index map from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
       try .init(from: jsonValue)

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension JSONLDValue {
+  /// A *value object* in JSON-LD.
   public struct ValueObject: JSONLDObjectProtocol, Equatable {
     let value: Value
     let context: Contexts?
@@ -12,11 +13,13 @@ extension JSONLDValue {
 }
 
 extension JSONLDValue.ValueObject {
+  /// The `@type` value for a value object.
   enum ValueType: JSONLDValueProtocol, Equatable {
     case iriOrTerm(String)
     case null
   }
 
+  /// The `@value` payload of a value object.
   enum Value: JSONLDValueProtocol, Equatable {
     case string(String)
     case integer(Int)
@@ -72,6 +75,7 @@ extension JSONLDValue.ValueObject.Value {
 }
 
 extension JSONLDValue.ValueObject {
+  /// Returns this value object as a JSON object.
   public var jsonObject: JSONObject {
     var jsonObject: JSONObject = [:]
 
@@ -92,6 +96,7 @@ extension JSONLDValue.ValueObject {
     return jsonObject
   }
 
+  /// Creates a value object from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     guard let value = properties.removeValue(for: .value) else {

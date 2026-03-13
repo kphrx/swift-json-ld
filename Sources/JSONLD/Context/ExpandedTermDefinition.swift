@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension Contexts.ContextDefinition {
+  /// A *context definition* value.
   public enum Value: JSONLDValueProtocol, Equatable, Sendable {
     case null
     case keyword(JSONLDKeyword)
@@ -11,6 +12,7 @@ extension Contexts.ContextDefinition {
 }
 
 extension Contexts.ContextDefinition.Value {
+  /// Returns this *context definition* value as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -20,6 +22,7 @@ extension Contexts.ContextDefinition.Value {
     }
   }
 
+  /// Creates a *context definition* value from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
@@ -40,12 +43,14 @@ extension Contexts.ContextDefinition.Value {
 }
 
 extension Contexts.ContextDefinition.Value: ExpressibleByNilLiteral {
+  /// Creates a `null` *context definition* value literal.
   public init(nilLiteral: ()) {
     self = .null
   }
 }
 
 extension Contexts.ContextDefinition.Value: ExpressibleByStringLiteral {
+  /// Creates a *context definition* value literal from a string.
   public init(stringLiteral value: String) {
     if let keyword = JSONLDKeyword(rawValue: value) {
       self = .keyword(keyword)
@@ -56,6 +61,7 @@ extension Contexts.ContextDefinition.Value: ExpressibleByStringLiteral {
 }
 
 extension Contexts.ContextDefinition.Value: ExpressibleByDictionaryLiteral {
+  /// Creates a *context definition* value literal from an *expanded term definition* object.
   public init(
     dictionaryLiteral elements: (String, String?)...
   ) {
@@ -64,6 +70,7 @@ extension Contexts.ContextDefinition.Value: ExpressibleByDictionaryLiteral {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition: ExpressibleByDictionaryLiteral {
+  /// Creates an *expanded term definition* literal from keyword entries.
   public init(dictionaryLiteral elements: (String, String?)...) {
     self = .fromLiteral(elements)
   }
@@ -76,19 +83,21 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
         from: .init(
           uniqueKeysWithValues: elements.map { key, value in
             guard JSONLDKeyword(rawValue: key) != nil else {
-              preconditionFailure("Invalid term definition literal: unknown keyword \(key)")
+              preconditionFailure(
+                "Invalid expanded term definition literal: unknown keyword \(key)")
             }
             return (key, value.map(JSONValue.string) ?? .null)
           }
         )
       )
     } catch {
-      preconditionFailure("Invalid term definition literal: \(error)")
+      preconditionFailure("Invalid expanded term definition literal: \(error)")
     }
   }
 }
 
 extension Contexts.ContextDefinition {
+  /// An *expanded term definition* object.
   public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
     case standard(Standard)
     case reverse(Reverse)
@@ -96,6 +105,7 @@ extension Contexts.ContextDefinition {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  /// Returns this *expanded term definition* as a JSON object.
   public var jsonObject: JSONObject {
     switch self {
     case .standard(let standard): standard.jsonObject
@@ -103,6 +113,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
     }
   }
 
+  /// Creates an *expanded term definition* from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
 
@@ -158,6 +169,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  /// A standard *expanded term definition*.
   public struct Standard: Equatable, Sendable {
     let id: Id?
     let type: TermType?
@@ -212,6 +224,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
     }
   }
 
+  /// A reverse *expanded term definition*.
   public struct Reverse: Equatable, Sendable {
     let reverse: ReverseProperty
     let type: TermType?
@@ -264,6 +277,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
     }
   }
 
+  /// The `@container` mapping for an *expanded term definition*.
   public enum Container: JSONLDValueProtocol, Equatable, Sendable {
     case null
     case set
@@ -290,6 +304,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
       self.keyword?.jsonValue ?? .null
     }
 
+    /// Creates a container mapping from a JSON value.
     public init(from jsonValue: JSONValue) throws(JSONLDError) {
       switch jsonValue {
       case .null:
@@ -317,6 +332,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  /// The `@id` mapping for an *expanded term definition*.
   public enum Id: JSONLDValueProtocol, Equatable, Sendable {
     case null
     case keyword(JSONLDKeyword)
@@ -325,6 +341,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition.Id {
+  /// Returns this `@id` mapping as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -333,6 +350,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.Id {
     }
   }
 
+  /// Creates an `@id` mapping from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
@@ -351,6 +369,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.Id {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition.Reverse {
+  /// The `@container` mapping for a reverse *expanded term definition*.
   public enum Container: Equatable, Sendable {
     case null
     case set
@@ -387,6 +406,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.Reverse {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  /// The `@type` mapping for an *expanded term definition*.
   public enum TermType: JSONLDValueProtocol, Equatable, Sendable {
     case null
     case keyword(JSONLDKeyword)
@@ -395,6 +415,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition.TermType {
+  /// Returns this `@type` mapping as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -403,6 +424,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.TermType {
     }
   }
 
+  /// Creates a `@type` mapping from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
@@ -425,6 +447,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.TermType {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  /// The `@language` mapping for an *expanded term definition*.
   public enum Language: JSONLDValueProtocol, Equatable, Sendable {
     case null
     case string(String)
@@ -432,6 +455,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition.Language {
+  /// Returns this `@language` mapping as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -439,6 +463,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.Language {
     }
   }
 
+  /// Creates a `@language` mapping from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
@@ -453,6 +478,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.Language {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
+  /// The `@reverse` mapping for an *expanded term definition*.
   public enum ReverseProperty: JSONLDValueProtocol, Equatable, Sendable {
     case null
     case string(String)
@@ -460,6 +486,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
 }
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition.ReverseProperty {
+  /// Returns this `@reverse` mapping as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
     case .null: .null
@@ -467,6 +494,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.ReverseProperty {
     }
   }
 
+  /// Creates a `@reverse` mapping from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {

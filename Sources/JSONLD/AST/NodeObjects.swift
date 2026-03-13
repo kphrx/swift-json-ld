@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension JSONLDValue {
+  /// A *node object* in JSON-LD.
   public struct NodeObject: JSONLDObjectProtocol, Equatable {
     let context: Contexts?
     let id: String?
@@ -14,6 +15,7 @@ extension JSONLDValue {
 }
 
 extension JSONLDValue.NodeObject {
+  /// Returns this node object as a JSON object.
   public var jsonObject: JSONObject {
     var jsonObject = self.properties.jsonObject
 
@@ -44,6 +46,7 @@ extension JSONLDValue.NodeObject {
     return jsonObject
   }
 
+  /// Creates a node object from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     guard !jsonObject.contains(.value),
       !jsonObject.contains(.language),

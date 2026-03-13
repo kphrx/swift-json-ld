@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension JSONLDValue {
+  /// A *set object* or *list object* in JSON-LD.
   public enum SetOrListObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
     case set(SingleOrMany<Element>, context: Contexts?, index: String?)
     case list(SingleOrMany<Element>, context: Contexts?, index: String?)
@@ -9,6 +10,7 @@ extension JSONLDValue {
 }
 
 extension JSONLDValue.SetOrListObject {
+  /// An element contained in a `@set` or `@list`.
   public enum Element: JSONLDValueProtocol, Equatable {
     case string(String)
     case integer(Int)
@@ -25,6 +27,7 @@ extension JSONLDValue.SetOrListObject.Element {
     try jsonArray.map(Self.init(from:))
   }
 
+  /// Returns this element as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
     case .string(let value): .string(value)
@@ -37,6 +40,7 @@ extension JSONLDValue.SetOrListObject.Element {
     }
   }
 
+  /// Creates an element from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
@@ -96,6 +100,7 @@ extension JSONLDValue.SetOrListObject {
     }
   }
 
+  /// Returns this set or list as a JSON object.
   public var jsonObject: JSONObject {
     var jsonObject: JSONObject = [:]
     jsonObject[self.keyword] = self.values.jsonValue
@@ -111,6 +116,7 @@ extension JSONLDValue.SetOrListObject {
     return jsonObject
   }
 
+  /// Creates a set or list object from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     var properties = jsonObject
     let context = try properties.extractContext()
