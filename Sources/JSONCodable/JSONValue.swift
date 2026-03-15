@@ -53,6 +53,7 @@ public enum JSONValue: Sendable, Equatable {
 }
 
 extension JSONValue: Codable {
+  /// Creates a JSON value by decoding from the given decoder.
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
 
@@ -74,6 +75,7 @@ extension JSONValue: Codable {
       }
   }
 
+  /// Encodes this JSON value as JSON data.
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
 
@@ -165,6 +167,13 @@ extension JSONValue: CustomDebugStringConvertible {
       encoder.outputFormatting.insert(.withoutEscapingSlashes)
     }
 
-    return .init(data: try! encoder.encode(self), encoding: .utf8)!
+    do {
+      guard let json = String(data: try encoder.encode(self), encoding: .utf8) else {
+        fatalError("Failed to encode JSONValue for debug description: Invalid UTF-8 data")
+      }
+      return json
+    } catch {
+      fatalError("Failed to encode JSONValue for debug description: \(error)")
+    }
   }
 }
