@@ -54,7 +54,7 @@ jobs:
       run: |
         BINARY_PATH="$(swift build --show-bin-path)"
         CODECOV_PATH="$(swift test --show-codecov-path | xargs dirname)"
-        llvm-cov report -ignore-filename-regex="/.build/|/Tests/" -instr-profile "${CODECOV_PATH}/default.profdata" "${BINARY_PATH}/JSONCodablePackageTests.xctest" \
+        llvm-cov report -ignore-filename-regex="/.build/|/Tests/" -instr-profile "${CODECOV_PATH}/default.profdata" "${BINARY_PATH}/swift-json-codablePackageTests.xctest" \
           | sed 's/  \+/|/g;s/--\+/||||||||||||/;2s/|/-|/g;s/-|$/-|-/' >> "$GITHUB_STEP_SUMMARY"
 
     - name: Setup pages
@@ -108,7 +108,7 @@ jobs:
         EOF
 
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
+      uses: actions/upload-pages-artifact@v4
 
   deploy:
 

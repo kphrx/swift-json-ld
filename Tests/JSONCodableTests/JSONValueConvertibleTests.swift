@@ -6,31 +6,36 @@ import Testing
 @testable import JSONCodable
 
 struct JSONValueConvertibleTests {
-  @Test("String to JSONValue.string") func string() throws {
+  @Test("String to JSONValue.string")
+  func string() throws {
     let value: String = "Hello, World!"
 
     #expect(value.jsonValue == .string("Hello, World!"))
   }
 
-  @Test("Int to JSONValue.integer") func integer() throws {
+  @Test("Int to JSONValue.integer")
+  func integer() throws {
     let value: Int = 65535
 
     #expect(value.jsonValue == .integer(65535))
   }
 
-  @Test("Double to JSONValue.float") func float() throws {
+  @Test("Double to JSONValue.float")
+  func float() throws {
     let value: Double = 3.14159
 
     #expect(value.jsonValue == .float(3.14159))
   }
 
-  @Test("Bool to JSONValue.boolean") func boolean() throws {
+  @Test("Bool to JSONValue.boolean")
+  func boolean() throws {
     let value: Bool = true
 
     #expect(value.jsonValue == .boolean(true))
   }
 
-  @Test("[String: Int] conforms to LosslessJSONObjectConvertible") func jsonObjectConvertible()
+  @Test("[String: Int] conforms to LosslessJSONObjectConvertible")
+  func jsonObjectConvertible()
     throws
   {
     let value: [String: Int] = ["one": 1, "two": 2, "three": 3]
@@ -38,7 +43,8 @@ struct JSONValueConvertibleTests {
     #expect(value.jsonObject == ["one": .integer(1), "two": .integer(2), "three": .integer(3)])
   }
 
-  @Test("CustomJSONArrayConvertible to JSONValue.array") func jsonArrayConvertible() throws {
+  @Test("CustomJSONArrayConvertible to JSONValue.array")
+  func jsonArrayConvertible() throws {
     struct KeyValueSequence: CustomJSONArrayConvertible {
       let keys: [String]
       let values: [Int]
@@ -66,10 +72,12 @@ struct JSONValueConvertibleTests {
       value.jsonValue
         == .array([
           .string("end"), .integer(1_612_137_600), .string("start"), .integer(1_609_459_200),
-        ]))
+        ])
+    )
   }
 
-  @Test("[CustomJSONObjectConvertible] to [JSONValue.object]") func arrayJsonObjectConvertible()
+  @Test("[CustomJSONObjectConvertible] to [JSONValue.object]")
+  func arrayJsonObjectConvertible()
     throws
   {
     struct Planet: CustomJSONObjectConvertible {
@@ -90,6 +98,7 @@ struct JSONValueConvertibleTests {
       value.jsonArray == [
         .object(["name": .string("Earth"), "mass": .float(5.972e24)]),
         .object(["name": .string("Mars"), "mass": .float(6.39e23)]),
-      ])
+      ]
+    )
   }
 }
