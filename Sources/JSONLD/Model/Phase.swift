@@ -11,8 +11,9 @@ public protocol JSONLDPhase: Sendable {
   /// Creates unknown content from a JSON object if the phase allows it.
   static func makeUnknown(from jsonObject: JSONObject) throws(JSONLDError) -> UnknownContent?
   /// Creates a reverse property value from a JSON value.
-  static func reversePropertyValue(from jsonValue: JSONValue) throws(JSONLDError)
-    -> ReversePropertyValue
+  static func reversePropertyValue(
+    from jsonValue: JSONValue
+  ) throws(JSONLDError) -> ReversePropertyValue
 }
 
 /// The phase representing raw, unresolved JSON-LD input.
@@ -29,9 +30,9 @@ public enum Unresolved: JSONLDPhase {
   }
 
   /// Creates a reverse property value from a JSON value.
-  public static func reversePropertyValue(from jsonValue: JSONValue) throws(JSONLDError)
-    -> ReversePropertyValue
-  {
+  public static func reversePropertyValue(
+    from jsonValue: JSONValue
+  ) throws(JSONLDError) -> ReversePropertyValue {
     try .init(from: jsonValue)
   }
 }
@@ -50,9 +51,9 @@ public enum Expanded: JSONLDPhase {
   }
 
   /// Creates a reverse property value from a JSON value.
-  public static func reversePropertyValue(from jsonValue: JSONValue) throws(JSONLDError)
-    -> ReversePropertyValue
-  {
+  public static func reversePropertyValue(
+    from jsonValue: JSONValue
+  ) throws(JSONLDError) -> ReversePropertyValue {
     if case .object(let object) = jsonValue {
       if object.contains(.value) || object.contains(.list) {
         throw .code(.invalidReversePropertyValue)
@@ -78,9 +79,9 @@ public enum Flattened: JSONLDPhase {
   }
 
   /// Creates a reverse property value from a JSON value.
-  public static func reversePropertyValue(from jsonValue: JSONValue) throws(JSONLDError)
-    -> ReversePropertyValue
-  {
+  public static func reversePropertyValue(
+    from jsonValue: JSONValue
+  ) throws(JSONLDError) -> ReversePropertyValue {
     try .init(from: jsonValue)
   }
 }
@@ -99,9 +100,9 @@ public enum Compacted: JSONLDPhase {
   }
 
   /// Creates a reverse property value from a JSON value.
-  public static func reversePropertyValue(from jsonValue: JSONValue) throws(JSONLDError)
-    -> ReversePropertyValue
-  {
+  public static func reversePropertyValue(
+    from jsonValue: JSONValue
+  ) throws(JSONLDError) -> ReversePropertyValue {
     try .init(from: jsonValue)
   }
 }

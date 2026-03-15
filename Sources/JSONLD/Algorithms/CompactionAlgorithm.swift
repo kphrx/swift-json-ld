@@ -55,9 +55,10 @@ struct CompactionAlgorithm {
     self.keywordAliases = keywordAliases
   }
 
-  private static func termDefinitions(from activeContext: ActiveContext, simpleTerms: Set<String>)
-    -> [TermDef]
-  {
+  private static func termDefinitions(
+    from activeContext: ActiveContext,
+    simpleTerms: Set<String>
+  ) -> [TermDef] {
     activeContext.termDefinitions.map { term, definition in
       .init(
         term: term,
@@ -78,12 +79,13 @@ struct CompactionAlgorithm {
         if key.hasPrefix("@") { return nil }
         if case .string = value { return key }
         return nil
-      })
+      }
+    )
   }
 
-  func compact<P: JSONLDPhase>(_ values: JSONLDValues<P>) throws(JSONLDError)
-    -> JSONLDDocument<Compacted>
-  {
+  func compact<P: JSONLDPhase>(
+    _ values: JSONLDValues<P>
+  ) throws(JSONLDError) -> JSONLDDocument<Compacted> {
     let input = values.jsonValue
     let elements: [JSONValue] =
       switch input {
@@ -125,9 +127,10 @@ struct CompactionAlgorithm {
     return try .init(validating: .object(object))
   }
 
-  private func compactElement(_ value: JSONValue, activeProperty: String?) throws(JSONLDError)
-    -> JSONValue?
-  {
+  private func compactElement(
+    _ value: JSONValue,
+    activeProperty: String?
+  ) throws(JSONLDError) -> JSONValue? {
     switch value {
     case .null:
       return nil
@@ -365,7 +368,8 @@ struct CompactionAlgorithm {
             }
           if let existing = compactedReverse[term] {
             compactedReverse[term] = .array(
-              Self.arrayValue(existing) + Self.arrayValue(compacted))
+              Self.arrayValue(existing) + Self.arrayValue(compacted)
+            )
           } else {
             compactedReverse[term] = compacted
           }
@@ -472,9 +476,10 @@ struct CompactionAlgorithm {
     return grouped
   }
 
-  private func compactIndexMap(_ values: [JSONValue], activeProperty: String?) throws(JSONLDError)
-    -> JSONObject?
-  {
+  private func compactIndexMap(
+    _ values: [JSONValue],
+    activeProperty: String?
+  ) throws(JSONLDError) -> JSONObject? {
     var map: JSONObject = [:]
     for value in values {
       guard case .object(let object) = value,
@@ -487,8 +492,9 @@ struct CompactionAlgorithm {
       compactedValue.removeValue(forKey: JSONLDKeyword.index.rawValue)
       let compacted =
         if let value = try self.compactElement(
-          .object(compactedValue), activeProperty: activeProperty)
-        {
+          .object(compactedValue),
+          activeProperty: activeProperty
+        ) {
           value
         } else {
           JSONValue.null
@@ -537,9 +543,10 @@ struct CompactionAlgorithm {
     return map
   }
 
-  private func compactValueObject(_ object: JSONObject, activeProperty: String?) throws(JSONLDError)
-    -> JSONValue
-  {
+  private func compactValueObject(
+    _ object: JSONObject,
+    activeProperty: String?
+  ) throws(JSONLDError) -> JSONValue {
     guard let value = object[JSONLDKeyword.value.rawValue] else { return .object(object) }
     let type = Self.stringValue(object[JSONLDKeyword.type.rawValue])
     let language = Self.stringValue(object[JSONLDKeyword.language.rawValue])
@@ -589,7 +596,8 @@ struct CompactionAlgorithm {
     var result: JSONObject = [self.alias(for: JSONLDKeyword.value.rawValue): value]
     if let type {
       result[self.alias(for: JSONLDKeyword.type.rawValue)] = .string(
-        self.compactIRI(type, vocab: true))
+        self.compactIRI(type, vocab: true)
+      )
     }
     if let language {
       result[self.alias(for: JSONLDKeyword.language.rawValue)] = .string(language)
@@ -768,9 +776,12 @@ struct CompactionAlgorithm {
     self.keywordAliases[keyword] ?? keyword
   }
 
-  private func selectTerm(iri: String, value: JSONValue, containerHint: String?, reverse: Bool)
-    -> String
-  {
+  private func selectTerm(
+    iri: String,
+    value: JSONValue,
+    containerHint: String?,
+    reverse: Bool
+  ) -> String {
     guard let iriCandidates = self.iriToTerms[iri] else {
       if let compact = self.compactWithTerms(iri, includeVocab: true) {
         return compact
@@ -808,7 +819,10 @@ struct CompactionAlgorithm {
           let typedCandidates = listCandidates.filter { $0.type == type }
           if !typedCandidates.isEmpty {
             return self.bestTerm(
-              from: typedCandidates, value: value, containerHint: JSONLDKeyword.list.rawValue)
+              from: typedCandidates,
+              value: value,
+              containerHint: JSONLDKeyword.list.rawValue
+            )
           }
         }
         if let language = Self.homogeneousLanguage(in: listItems) {
@@ -827,13 +841,19 @@ struct CompactionAlgorithm {
           }
           if !languageCandidates.isEmpty {
             return self.bestTerm(
-              from: languageCandidates, value: value, containerHint: JSONLDKeyword.list.rawValue)
+              from: languageCandidates,
+              value: value,
+              containerHint: JSONLDKeyword.list.rawValue
+            )
           }
         }
         let unconstrained = listCandidates.filter { $0.type == nil && !$0.languageDefined }
         if !unconstrained.isEmpty {
           return self.bestTerm(
-            from: unconstrained, value: value, containerHint: JSONLDKeyword.list.rawValue)
+            from: unconstrained,
+            value: value,
+            containerHint: JSONLDKeyword.list.rawValue
+          )
         }
       }
     }
@@ -971,9 +991,11 @@ struct CompactionAlgorithm {
     }
   }
 
-  private func bestTerm(from candidates: [TermDef], value: JSONValue, containerHint: String?)
-    -> String
-  {
+  private func bestTerm(
+    from candidates: [TermDef],
+    value: JSONValue,
+    containerHint: String?
+  ) -> String {
     let sorted = candidates.sorted { a, b in
       let scoreA = self.scoreTerm(a, value: value, containerHint: containerHint)
       let scoreB = self.scoreTerm(b, value: value, containerHint: containerHint)
@@ -1001,9 +1023,11 @@ struct CompactionAlgorithm {
     return sorted.first?.term ?? candidates[0].term
   }
 
-  private func scoreTerm(_ candidate: TermDef, value: JSONValue, containerHint: String?) -> (
-    Int, Int, Int, String
-  ) {
+  private func scoreTerm(
+    _ candidate: TermDef,
+    value: JSONValue,
+    containerHint: String?
+  ) -> (Int, Int, Int, String) {
     let containerPriority: Int =
       if let containerHint, candidate.container == containerHint {
         0
@@ -1219,17 +1243,17 @@ struct CompactionAlgorithm {
     return string
   }
 
-  static func validateInvalidCompactionInputs(_ values: JSONLDValues<Unresolved>)
-    throws(JSONLDError)
-  {
+  static func validateInvalidCompactionInputs(
+    _ values: JSONLDValues<Unresolved>
+  ) throws(JSONLDError) {
     for value in values.value {
       try Self.validateInvalidCompactionInput(value)
     }
   }
 
-  private static func validateInvalidCompactionInput(_ value: JSONLDValue<Unresolved>)
-    throws(JSONLDError)
-  {
+  private static func validateInvalidCompactionInput(
+    _ value: JSONLDValue<Unresolved>
+  ) throws(JSONLDError) {
     switch value {
     case .invalid(.listOfLists):
       throw .code(.compactionToListOfLists)

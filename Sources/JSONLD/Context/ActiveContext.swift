@@ -137,7 +137,12 @@ struct ActiveContext: Equatable, Sendable {
     switch value {
     case .iriOrTerm(let iri):
       termDefinition.iri = try self.expandIRIForDefinition(
-        iri, asVocab: true, definition: definition, term: term, defined: &defined)
+        iri,
+        asVocab: true,
+        definition: definition,
+        term: term,
+        defined: &defined
+      )
 
       if !self.isAbsoluteIRI(termDefinition.iri) && !termDefinition.iri.hasPrefix("_:") {
         throw .code(.invalidIRIMapping)
@@ -160,7 +165,12 @@ struct ActiveContext: Equatable, Sendable {
           termDefinition.iri = keyword.rawValue
         case .iriOrTerm(let iri)?:
           termDefinition.iri = try self.expandIRIForDefinition(
-            iri, asVocab: true, definition: definition, term: term, defined: &defined)
+            iri,
+            asVocab: true,
+            definition: definition,
+            term: term,
+            defined: &defined
+          )
           if !self.isAbsoluteIRI(termDefinition.iri) && !termDefinition.iri.hasPrefix("_:") {
             throw .code(.invalidIRIMapping)
           }
@@ -201,7 +211,12 @@ struct ActiveContext: Equatable, Sendable {
           termDefinition.typeMapping = keyword.rawValue
         case .iriOrTerm(let iri)?:
           let typeMapping = try self.expandIRIForDefinition(
-            iri, asVocab: true, definition: definition, term: term, defined: &defined)
+            iri,
+            asVocab: true,
+            definition: definition,
+            term: term,
+            defined: &defined
+          )
           if typeMapping != "@id" && typeMapping != "@vocab" && !self.isAbsoluteIRI(typeMapping) {
             throw .code(.invalidTypeMapping)
           }
@@ -237,7 +252,12 @@ struct ActiveContext: Equatable, Sendable {
         let reverseIRI: String =
           if case .string(let s) = reverse.reverse.jsonValue { s } else { "" }
         termDefinition.iri = try self.expandIRIForDefinition(
-          reverseIRI, asVocab: true, definition: definition, term: term, defined: &defined)
+          reverseIRI,
+          asVocab: true,
+          definition: definition,
+          term: term,
+          defined: &defined
+        )
 
         if !self.isAbsoluteIRI(termDefinition.iri) && !termDefinition.iri.hasPrefix("_:") {
           throw .code(.invalidIRIMapping)
@@ -257,7 +277,12 @@ struct ActiveContext: Equatable, Sendable {
           termDefinition.typeMapping = keyword.rawValue
         case .iriOrTerm(let iri)?:
           let typeMapping = try self.expandIRIForDefinition(
-            iri, asVocab: true, definition: definition, term: term, defined: &defined)
+            iri,
+            asVocab: true,
+            definition: definition,
+            term: term,
+            defined: &defined
+          )
           if typeMapping != "@id" && typeMapping != "@vocab" && !self.isAbsoluteIRI(typeMapping) {
             throw .code(.invalidTypeMapping)
           }
@@ -453,9 +478,9 @@ struct ActiveContext: Equatable, Sendable {
     self.termDefinitions[term]?.languageMappingDefined ?? false
   }
 
-  func containerMapping(for term: String)
-    -> Contexts.ContextDefinition.ExpandedTermDefinition.Container
-  {
+  func containerMapping(
+    for term: String
+  ) -> Contexts.ContextDefinition.ExpandedTermDefinition.Container {
     self.termDefinitions[term]?.containerMapping ?? .null
   }
 }

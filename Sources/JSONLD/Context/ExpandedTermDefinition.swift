@@ -84,7 +84,8 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
           uniqueKeysWithValues: elements.map { key, value in
             guard JSONLDKeyword(rawValue: key) != nil else {
               preconditionFailure(
-                "Invalid expanded term definition literal: unknown keyword \(key)")
+                "Invalid expanded term definition literal: unknown keyword \(key)"
+              )
             }
             return (key, value.map(JSONValue.string) ?? .null)
           }
@@ -149,7 +150,8 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
           nest: nest,
           prefix: prefix,
           protected: protected
-        ))
+        )
+      )
     } else {
       self = .standard(
         .init(
@@ -162,7 +164,8 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
           nest: nest,
           prefix: prefix,
           protected: protected
-        ))
+        )
+      )
     }
     _ = properties
   }
@@ -391,9 +394,9 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.Reverse {
       self.keyword?.jsonValue ?? .null
     }
 
-    init(from container: Contexts.ContextDefinition.ExpandedTermDefinition.Container)
-      throws(JSONLDError)
-    {
+    init(
+      from container: Contexts.ContextDefinition.ExpandedTermDefinition.Container
+    ) throws(JSONLDError) {
       switch container {
       case .null:
         self = .null

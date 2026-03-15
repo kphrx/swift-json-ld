@@ -132,9 +132,9 @@ extension Contexts.Element {
       }
   }
 
-  fileprivate static func fromLiteral(_ elements: [(String, Contexts.ContextDefinition.Value)])
-    -> Self
-  {
+  fileprivate static func fromLiteral(
+    _ elements: [(String, Contexts.ContextDefinition.Value)]
+  ) -> Self {
     var jsonObject: JSONObject = [:]
     for (key, value) in elements {
       jsonObject[key] = value.jsonValue

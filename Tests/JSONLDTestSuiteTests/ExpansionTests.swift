@@ -6,11 +6,13 @@ import Testing
 @testable import JSONLD
 
 @Suite(
-  .disabled(if: TestCaseLoader.expansionTestsManifest == nil, "Missing expansion test manifest"))
+  .disabled(if: TestCaseLoader.expansionTestsManifest == nil, "Missing expansion test manifest")
+)
 struct ExpansionTests {
   @Test(
     "[Expansion] Positive Evaluation Test with processingMode 1.0",
-    arguments: TestCaseLoader.expansionTestsPositiveCases(version: .v1p0))
+    arguments: TestCaseLoader.expansionTestsPositiveCases(version: .v1p0)
+  )
   func positiveEvaluationTestOneZero(testCase: ExpandTest.PositiveCase) async throws {
     let processor = JSONLDProcessor()
     processor.loader = TestDocumentLoader()
@@ -29,23 +31,28 @@ struct ExpansionTests {
     )
 
     let expect = try TestCaseLoader.load(
-      testCase.expectFilename, type: JSONLDDocument<Unresolved>.self)
+      testCase.expectFilename,
+      type: JSONLDDocument<Unresolved>.self
+    )
     #expect(actual.jsonValue == expect.jsonValue)
   }
 
   @Test(
     "[Expansion] Positive Evaluation Test with processingMode 1.1",
     .disabled("Unsupported JSON-LD 1.1"),
-    arguments: TestCaseLoader.expansionTestsPositiveCases(version: .v1p1))
+    arguments: TestCaseLoader.expansionTestsPositiveCases(version: .v1p1)
+  )
   func positiveEvaluationTestOneOne(testCase: ExpandTest.PositiveCase) {}
 
   @Test(
     "[Expansion] Negative Evaluation Test with processingMode 1.0",
-    arguments: TestCaseLoader.expansionTestsNegativeCases(version: .v1p0))
+    arguments: TestCaseLoader.expansionTestsNegativeCases(version: .v1p0)
+  )
   func negativeEvaluationTestOneZero(testCase: ExpandTest.NegativeCase) async throws {
     guard let expectError = JSONLDError.Code(rawValue: testCase.expectErrorCode) else {
       Issue.record(
-        "Missing JSONLDError case for expected error code: '\(testCase.expectErrorCode)'")
+        "Missing JSONLDError case for expected error code: '\(testCase.expectErrorCode)'"
+      )
       return
     }
 
@@ -71,6 +78,7 @@ struct ExpansionTests {
   @Test(
     "[Expansion] Negative Evaluation Test with processingMode 1.1",
     .disabled("Unsupported JSON-LD 1.1"),
-    arguments: TestCaseLoader.expansionTestsNegativeCases(version: .v1p1))
+    arguments: TestCaseLoader.expansionTestsNegativeCases(version: .v1p1)
+  )
   func negativeEvaluationTestOneOne(testCase: ExpandTest.NegativeCase) {}
 }

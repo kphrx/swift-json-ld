@@ -15,7 +15,12 @@ enum ExpansionProcessor {
     for item in value {
       guard
         let expanded = try await self.expand(
-          activeContext, value: item, property: property, insideList: insideList, loader: loader)
+          activeContext,
+          value: item,
+          property: property,
+          insideList: insideList,
+          loader: loader
+        )
       else {
         continue
       }
@@ -39,7 +44,12 @@ enum ExpansionProcessor {
     switch value {
     case .unknown(let content):
       try await self.expandObject(
-        activeContext, object: content, property: property, insideList: insideList, loader: loader)
+        activeContext,
+        object: content,
+        property: property,
+        insideList: insideList,
+        loader: loader
+      )
 
     case .invalid(let invalid):
       try self.handleInvalidValue(invalid)
@@ -61,32 +71,48 @@ enum ExpansionProcessor {
 
     case .node(let nodeObject):
       try await self.expandNode(
-        activeContext, node: nodeObject, property: property, insideList: insideList, loader: loader)
+        activeContext,
+        node: nodeObject,
+        property: property,
+        insideList: insideList,
+        loader: loader
+      )
 
     case .value(let valueObject):
       try await self.expandValue(
-        activeContext, value: valueObject, property: property, insideList: insideList,
-        loader: loader)
+        activeContext,
+        value: valueObject,
+        property: property,
+        insideList: insideList,
+        loader: loader
+      )
 
     case .setOrList(let setOrListObject):
       try await self.expandSetOrList(
-        activeContext, setOrList: setOrListObject, property: property, insideList: insideList,
-        loader: loader)
+        activeContext,
+        setOrList: setOrListObject,
+        property: property,
+        insideList: insideList,
+        loader: loader
+      )
 
     case .languageMap(let languageMap):
       try self.expandLanguageMap(activeContext, languageMap: languageMap)
 
     case .indexMap(let indexMap):
       try await self.expandIndexMap(
-        activeContext, indexMap: indexMap, property: property, insideList: insideList,
+        activeContext,
+        indexMap: indexMap,
+        property: property,
+        insideList: insideList,
         loader: loader
       )
     }
   }
 
-  private static func handleInvalidValue(_ invalid: JSONLDValue<Unresolved>.InvalidValue)
-    throws(JSONLDError) -> JSONLDValue<Expanded>?
-  {
+  private static func handleInvalidValue(
+    _ invalid: JSONLDValue<Unresolved>.InvalidValue
+  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
     switch invalid {
     case .listOfLists: throw .code(.listOfLists)
     case .notJSONLDValue: nil
@@ -122,12 +148,14 @@ enum ExpansionProcessor {
         return try .node(.init(from: .object(["@id": .string(expandedId)])))
       }
       return try .value(
-        .init(from: .object(["@value": .string(value), "@type": .string(typeMapping)])))
+        .init(from: .object(["@value": .string(value), "@type": .string(typeMapping)]))
+      )
     }
 
     if let languageMapping = activeContext.languageMapping(for: property) {
       return try .value(
-        .init(from: .object(["@value": .string(value), "@language": .string(languageMapping)])))
+        .init(from: .object(["@value": .string(value), "@language": .string(languageMapping)]))
+      )
     }
 
     if activeContext.hasLanguageMapping(for: property) {
@@ -136,7 +164,8 @@ enum ExpansionProcessor {
 
     if let defaultLanguage = activeContext.defaultLanguage {
       return try .value(
-        .init(from: .object(["@value": .string(value), "@language": .string(defaultLanguage)])))
+        .init(from: .object(["@value": .string(value), "@language": .string(defaultLanguage)]))
+      )
     }
 
     return try .value(.init(from: .object(["@value": .string(value)])))
@@ -158,7 +187,8 @@ enum ExpansionProcessor {
         return try .value(.init(from: .object(["@value": .integer(value)])))
       }
       return try .value(
-        .init(from: .object(["@value": .integer(value), "@type": .string(typeMapping)])))
+        .init(from: .object(["@value": .integer(value), "@type": .string(typeMapping)]))
+      )
     }
 
     return try .value(.init(from: .object(["@value": .integer(value)])))
@@ -180,7 +210,8 @@ enum ExpansionProcessor {
         return try .value(.init(from: .object(["@value": .float(value)])))
       }
       return try .value(
-        .init(from: .object(["@value": .float(value), "@type": .string(typeMapping)])))
+        .init(from: .object(["@value": .float(value), "@type": .string(typeMapping)]))
+      )
     }
 
     return try .value(.init(from: .object(["@value": .float(value)])))
@@ -202,7 +233,8 @@ enum ExpansionProcessor {
         return try .value(.init(from: .object(["@value": .boolean(value)])))
       }
       return try .value(
-        .init(from: .object(["@value": .boolean(value), "@type": .string(typeMapping)])))
+        .init(from: .object(["@value": .boolean(value), "@type": .string(typeMapping)]))
+      )
     }
 
     return try .value(.init(from: .object(["@value": .boolean(value)])))
@@ -218,7 +250,9 @@ enum ExpansionProcessor {
     var activeContext = activeContext
     if let localContext = node.context {
       activeContext = try await activeContext.process(
-        contexts: localContext, loader: loader)
+        contexts: localContext,
+        loader: loader
+      )
     }
 
     var combinedProperties = node.properties
@@ -237,8 +271,12 @@ enum ExpansionProcessor {
     }
 
     return try await self.expandObject(
-      activeContext, object: combinedProperties, property: property, insideList: insideList,
-      loader: loader)
+      activeContext,
+      object: combinedProperties,
+      property: property,
+      insideList: insideList,
+      loader: loader
+    )
   }
 
   private static func expandValue(
@@ -252,7 +290,12 @@ enum ExpansionProcessor {
       SingleOrMany<JSONLDValue<Unresolved>>.init(from:)
     )
     return try await self.expandObject(
-      activeContext, object: object, property: property, insideList: insideList, loader: loader)
+      activeContext,
+      object: object,
+      property: property,
+      insideList: insideList,
+      loader: loader
+    )
   }
 
   private static func expandSetOrList(
@@ -266,16 +309,25 @@ enum ExpansionProcessor {
     case .set(let values, _, let index):
       let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
       let expanded = try await self.expand(
-        activeContext, value: .many(unresolvedItems), property: property, insideList: insideList,
-        loader: loader)
+        activeContext,
+        value: .many(unresolvedItems),
+        property: property,
+        insideList: insideList,
+        loader: loader
+      )
       return try .setOrList(
-        .set(.many(expanded.map { .init($0) }), context: nil, index: index))
+        .set(.many(expanded.map { .init($0) }), context: nil, index: index)
+      )
     case .list(let values, _, let index):
       if insideList { throw .code(.listOfLists) }
       let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
       let expanded = try await self.expand(
-        activeContext, value: .many(unresolvedItems), property: property, insideList: true,
-        loader: loader)
+        activeContext,
+        value: .many(unresolvedItems),
+        property: property,
+        insideList: true,
+        loader: loader
+      )
 
       for item in expanded {
         if case .setOrList(.list) = item {
@@ -284,7 +336,8 @@ enum ExpansionProcessor {
       }
 
       return try .setOrList(
-        .list(.many(expanded.map { .init($0) }), context: nil, index: index))
+        .list(.many(expanded.map { .init($0) }), context: nil, index: index)
+      )
     }
   }
 
@@ -298,12 +351,14 @@ enum ExpansionProcessor {
         guard case .string(let s) = val else { throw .code(.invalidLanguageMapValue) }
         expandedItems.append(
           try .value(
-            .init(from: .object(["@value": .string(s), "@language": .string(lang.lowercased())])))
+            .init(from: .object(["@value": .string(s), "@language": .string(lang.lowercased())]))
+          )
         )
       }
     }
     return .setOrList(
-      .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
+      .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil)
+    )
   }
 
   private static func expandIndexMap(
@@ -317,12 +372,17 @@ enum ExpansionProcessor {
     for (_, values) in indexMap.map.sorted(by: { $0.key < $1.key }) {
       let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
       let expanded = try await self.expand(
-        activeContext, value: .many(unresolvedItems), property: property, insideList: insideList,
-        loader: loader)
+        activeContext,
+        value: .many(unresolvedItems),
+        property: property,
+        insideList: insideList,
+        loader: loader
+      )
       expandedItems.append(contentsOf: expanded)
     }
     return .setOrList(
-      .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil))
+      .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil)
+    )
   }
 
   private static func expandObject(
@@ -337,7 +397,9 @@ enum ExpansionProcessor {
 
     if let localContextValue = object.removeValue(forKey: JSONLDKeyword.context.rawValue) {
       activeContext = try await activeContext.process(
-        contexts: try .init(from: localContextValue.jsonValue), loader: loader)
+        contexts: try .init(from: localContextValue.jsonValue),
+        loader: loader
+      )
     }
 
     var expandedProperties: JSONObject = [:]
@@ -354,11 +416,19 @@ enum ExpansionProcessor {
 
       case .id?:
         try self.expandIdKeyword(
-          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext)
+          val,
+          into: &expandedProperties,
+          key: expandedProperty,
+          activeContext: activeContext
+        )
 
       case .type?:
         try self.expandTypeKeyword(
-          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext)
+          val,
+          into: &expandedProperties,
+          key: expandedProperty,
+          activeContext: activeContext
+        )
 
       case .value?:
         try self.expandValueKeyword(val, into: &expandedProperties, key: expandedProperty)
@@ -368,30 +438,57 @@ enum ExpansionProcessor {
 
       case .list?:
         try await self.expandListKeyword(
-          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext,
-          property: property, insideList: insideList, loader: loader)
+          val,
+          into: &expandedProperties,
+          key: expandedProperty,
+          activeContext: activeContext,
+          property: property,
+          insideList: insideList,
+          loader: loader
+        )
 
       case .set?:
         try await self.expandSetKeyword(
-          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext,
-          property: property, insideList: insideList, loader: loader)
+          val,
+          into: &expandedProperties,
+          key: expandedProperty,
+          activeContext: activeContext,
+          property: property,
+          insideList: insideList,
+          loader: loader
+        )
 
       case .graph?:
         try await self.expandGraphKeyword(
-          val, into: &expandedProperties, key: expandedProperty, activeContext: activeContext,
-          loader: loader)
+          val,
+          into: &expandedProperties,
+          key: expandedProperty,
+          activeContext: activeContext,
+          loader: loader
+        )
 
       case .index?:
         try self.expandIndexKeyword(val, into: &expandedProperties, key: expandedProperty)
 
       case .reverse?:
         try await self.expandReverseKeyword(
-          val, into: &expandedProperties, activeContext: activeContext, loader: loader)
+          val,
+          into: &expandedProperties,
+          activeContext: activeContext,
+          loader: loader
+        )
 
       case nil:
         try await self.expandTermProperty(
-          val, into: &expandedProperties, expandedProperty: expandedProperty, term: key,
-          activeContext: activeContext, property: property, insideList: insideList, loader: loader)
+          val,
+          into: &expandedProperties,
+          expandedProperty: expandedProperty,
+          term: key,
+          activeContext: activeContext,
+          property: property,
+          insideList: insideList,
+          loader: loader
+        )
 
       default:
         continue
@@ -399,7 +496,10 @@ enum ExpansionProcessor {
     }
 
     return try self.finalizeExpandedObject(
-      &expandedProperties, property: property, activeContext: activeContext)
+      &expandedProperties,
+      property: property,
+      activeContext: activeContext
+    )
   }
 
   private static func expandIdKeyword(
@@ -428,7 +528,10 @@ enum ExpansionProcessor {
     for item in value {
       guard case .iriOrTerm(let s) = item else { throw .code(.invalidTypeValue) }
       let expandedType = try activeContext.expandIRI(
-        s, asVocab: true, asDocumentRelative: true)
+        s,
+        asVocab: true,
+        asDocumentRelative: true
+      )
       expandedTypes.append(.string(expandedType))
     }
     properties[key] = .array(expandedTypes)
@@ -467,7 +570,12 @@ enum ExpansionProcessor {
   ) async throws(JSONLDError) {
     if insideList { throw .code(.listOfLists) }
     let expandedList = try await self.expand(
-      activeContext, value: value, property: property, insideList: true, loader: loader)
+      activeContext,
+      value: value,
+      property: property,
+      insideList: true,
+      loader: loader
+    )
 
     for item in expandedList {
       if case .setOrList(.list) = item {
@@ -487,7 +595,12 @@ enum ExpansionProcessor {
     loader: (any JSONLDDocumentLoader)?
   ) async throws(JSONLDError) {
     let expandedSet = try await self.expand(
-      activeContext, value: value, property: property, insideList: insideList, loader: loader)
+      activeContext,
+      value: value,
+      property: property,
+      insideList: insideList,
+      loader: loader
+    )
     properties[key] = .array(expandedSet.map(\.jsonValue))
   }
 
@@ -499,7 +612,12 @@ enum ExpansionProcessor {
     loader: (any JSONLDDocumentLoader)?
   ) async throws(JSONLDError) {
     let expandedGraph = try await self.expand(
-      activeContext, value: value, property: "@graph", insideList: false, loader: loader)
+      activeContext,
+      value: value,
+      property: "@graph",
+      insideList: false,
+      loader: loader
+    )
     properties[key] = .array(expandedGraph.map(\.jsonValue))
   }
 
@@ -529,8 +647,12 @@ enum ExpansionProcessor {
       }
 
     if let expandedReverse = try await self.expandObject(
-      activeContext, object: reverseObject, property: "@reverse", insideList: false,
-      loader: loader),
+      activeContext,
+      object: reverseObject,
+      property: "@reverse",
+      insideList: false,
+      loader: loader
+    ),
       case .node(let node) = expandedReverse
     {
       for (reverseKey, reverseValue) in node.jsonObject {
@@ -635,7 +757,10 @@ enum ExpansionProcessor {
                 from: .object([
                   "@value": .string(s),
                   "@language": .string(lang.lowercased()),
-                ]))))
+                ])
+              )
+            )
+          )
         }
       }
       expandedValues = values
@@ -653,7 +778,12 @@ enum ExpansionProcessor {
       var values: [JSONLDValue<Expanded>] = []
       for (index, indexVal) in map.sorted(by: { $0.key < $1.key }) {
         let expanded = try await self.expand(
-          activeContext, value: indexVal, property: term, insideList: insideList, loader: loader)
+          activeContext,
+          value: indexVal,
+          property: term,
+          insideList: insideList,
+          loader: loader
+        )
 
         for item in expanded {
           if case .object(var object) = item.jsonValue {
@@ -669,8 +799,12 @@ enum ExpansionProcessor {
       expandedValues = values
     } else {
       expandedValues = try await self.expand(
-        activeContext, value: value, property: term, insideList: insideList,
-        loader: loader)
+        activeContext,
+        value: value,
+        property: term,
+        insideList: insideList,
+        loader: loader
+      )
     }
 
     let shouldIncludeProperty =
@@ -882,9 +1016,10 @@ enum ExpansionProcessor {
     return try .node(.init(from: .object(expandedProperties)))
   }
 
-  private static func validateIRI(_ iri: String, code: JSONLDError.Code) throws(JSONLDError)
-    -> String
-  {
+  private static func validateIRI(
+    _ iri: String,
+    code: JSONLDError.Code
+  ) throws(JSONLDError) -> String {
     if iri.contains(":") || JSONLDKeyword(rawValue: iri) != nil || iri.hasPrefix("_:") {
       return iri
     }

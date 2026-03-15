@@ -8,6 +8,7 @@ extension Dictionary {
     _ transform: (Value) throws(E) -> T
   ) throws(E) -> [Key: T] {
     try .init(
-      uniqueKeysWithValues: self.map { (key, value) throws(E) in (key, try transform(value)) })
+      uniqueKeysWithValues: self.map { (key, value) throws(E) in (key, try transform(value)) }
+    )
   }
 }

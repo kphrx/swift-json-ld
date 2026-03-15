@@ -8,11 +8,15 @@ enum Util {
     case missingFixture(String)
   }
 
-  static func loadFixture<T: Decodable>(_ name: String, from url: URL? = nil, type: T.Type = T.self)
-    throws -> T
-  {
+  static func loadFixture<T: Decodable>(
+    _ name: String,
+    from url: URL? = nil,
+    type: T.Type = T.self
+  ) throws -> T {
     try JSONDecoder().decode(
-      type, from: Data(contentsOf: self.findResourceURL(for: name, from: url)))
+      type,
+      from: Data(contentsOf: self.findResourceURL(for: name, from: url))
+    )
   }
 
   private static func findResourceURL(for name: String, from url: URL?) throws(Error) -> URL {
@@ -20,8 +24,10 @@ enum Util {
     {
       url
     } else if let url = Bundle.module.url(
-      forResource: name, withExtension: nil, subdirectory: "Fixtures/json-ld-api-tests")
-    {
+      forResource: name,
+      withExtension: nil,
+      subdirectory: "Fixtures/json-ld-api-tests"
+    ) {
       url
     } else {
       throw .missingFixture(name)

@@ -26,14 +26,22 @@ struct ContextResolver {
     switch contexts {
     case .null:
       return .init(
-        baseIRI: activeContext.originalBaseIRI, originalBaseIRI: activeContext.originalBaseIRI)
+        baseIRI: activeContext.originalBaseIRI,
+        originalBaseIRI: activeContext.originalBaseIRI
+      )
     case .single(let context):
       try await self.process(
-        context: context, activeContext: &result, remoteContexts: remoteContexts)
+        context: context,
+        activeContext: &result,
+        remoteContexts: remoteContexts
+      )
     case .array(let contexts):
       for context in contexts {
         try await self.process(
-          context: context, activeContext: &result, remoteContexts: remoteContexts)
+          context: context,
+          activeContext: &result,
+          remoteContexts: remoteContexts
+        )
       }
     }
 
@@ -56,7 +64,8 @@ struct ContextResolver {
         // TODO: Add processingMode and throw `.code(.contextOverflow)` in json-ld-1.1 mode.
         throw .internalError(
           .implementationLimitExceeded,
-          debugInfo: .init(url: resolvedIRI))
+          debugInfo: .init(url: resolvedIRI)
+        )
       }
 
       var updatedRemoteContexts = remoteContexts
@@ -65,7 +74,8 @@ struct ContextResolver {
       guard let loader = self.loader else {
         throw .code(
           .loadingRemoteContextFailed,
-          debugInfo: .init(url: resolvedIRI, message: "document loader is not configured"))
+          debugInfo: .init(url: resolvedIRI, message: "document loader is not configured")
+        )
       }
 
       let result = await loader.load(url: resolvedIRI)
@@ -76,7 +86,8 @@ struct ContextResolver {
         case .failure(let error):
           throw .code(
             .loadingRemoteContextFailed,
-            debugInfo: .init(url: resolvedIRI, message: String(describing: error)))
+            debugInfo: .init(url: resolvedIRI, message: String(describing: error))
+          )
         }
 
       guard case .object(let object) = remoteDocument.document,
@@ -102,10 +113,9 @@ struct ContextResolver {
   }
 
   private func apply(
-    contextDefinition: Contexts.ContextDefinition, to activeContext: inout ActiveContext
-  )
-    throws(JSONLDError)
-  {
+    contextDefinition: Contexts.ContextDefinition,
+    to activeContext: inout ActiveContext
+  ) throws(JSONLDError) {
     try activeContext.applyBaseIRI(contextDefinition.baseIRI)
     try activeContext.applyVocabMapping(
       contextDefinition.vocabMapping,

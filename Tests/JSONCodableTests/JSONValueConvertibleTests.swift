@@ -35,9 +35,7 @@ struct JSONValueConvertibleTests {
   }
 
   @Test("[String: Int] conforms to LosslessJSONObjectConvertible")
-  func jsonObjectConvertible()
-    throws
-  {
+  func jsonObjectConvertible() throws {
     let value: [String: Int] = ["one": 1, "two": 2, "three": 3]
 
     #expect(value.jsonObject == ["one": .integer(1), "two": .integer(2), "three": .integer(3)])
@@ -77,9 +75,7 @@ struct JSONValueConvertibleTests {
   }
 
   @Test("[CustomJSONObjectConvertible] to [JSONValue.object]")
-  func arrayJsonObjectConvertible()
-    throws
-  {
+  func arrayJsonObjectConvertible() throws {
     struct Planet: CustomJSONObjectConvertible {
       let name: String
       let mass: Double

@@ -21,7 +21,7 @@ public class JSONLDProcessor {
     baseIRI: String? = nil,
     normative: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
-    return try await self.expand(
+    try await self.expand(
       document.values,
       expandContext: expandContext,
       baseIRI: baseIRI ?? document.documentURL,
@@ -96,7 +96,10 @@ public class JSONLDProcessor {
       activeContext: activeContext,
       contextValue: context.jsonValue,
       options: .init(
-        baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
+        baseIRI: baseIRI,
+        compactArrays: compactArrays,
+        compactToRelative: compactToRelative
+      )
     )
     return try algorithm.compact(expanded)
   }
@@ -114,7 +117,10 @@ public class JSONLDProcessor {
       activeContext: activeContext,
       contextValue: context.jsonValue,
       options: .init(
-        baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
+        baseIRI: baseIRI,
+        compactArrays: compactArrays,
+        compactToRelative: compactToRelative
+      )
     )
     return try algorithm.compact(values)
   }
@@ -132,7 +138,10 @@ public class JSONLDProcessor {
       activeContext: activeContext,
       contextValue: context.jsonValue,
       options: .init(
-        baseIRI: baseIRI, compactArrays: compactArrays, compactToRelative: compactToRelative)
+        baseIRI: baseIRI,
+        compactArrays: compactArrays,
+        compactToRelative: compactToRelative
+      )
     )
     return try algorithm.compact(values)
   }
@@ -158,9 +167,9 @@ public class JSONLDProcessor {
   }
 
   /// Flattens the specified expanded JSON-LD document.
-  public func flatten(_ document: JSONLDDocument<Expanded>) throws(JSONLDError)
-    -> JSONLDDocument<Flattened>
-  {
+  public func flatten(
+    _ document: JSONLDDocument<Expanded>
+  ) throws(JSONLDError) -> JSONLDDocument<Flattened> {
     try FlatteningAlgorithm.run(document)
   }
 
@@ -210,7 +219,8 @@ public class JSONLDProcessor {
       case .failure(let error):
         throw .code(
           .loadingRemoteContextFailed,
-          debugInfo: .init(url: url, message: String(describing: error)))
+          debugInfo: .init(url: url, message: String(describing: error))
+        )
       }
 
     let document = try JSONLDDocument<Unresolved>(from: remoteDocument.document)
@@ -229,14 +239,17 @@ private struct DefaultLoader: JSONLDDocumentLoader {
     .failure(
       JSONLDError.code(
         .loadingRemoteContextFailed,
-        debugInfo: .init(url: url, message: "default loader is not implemented")))
+        debugInfo: .init(url: url, message: "default loader is not implemented")
+      )
+    )
   }
 }
 
 extension JSONLDProcessor {
-  private func resolveActiveContext(context: Contexts, baseIRI: String?) async throws(JSONLDError)
-    -> ActiveContext
-  {
+  private func resolveActiveContext(
+    context: Contexts,
+    baseIRI: String?
+  ) async throws(JSONLDError) -> ActiveContext {
     var activeContext = ActiveContext.empty
     if let baseIRI {
       activeContext.baseIRI = baseIRI
@@ -251,5 +264,4 @@ extension JSONLDProcessor {
       activeContext: activeContext
     )
   }
-
 }
