@@ -38,7 +38,16 @@ jobs:
       run: swift build ${{ runner.debug == '1' && '--verbose' || '' }}
     - name: Build test code
       run: swift build --build-tests --enable-code-coverage ${{ runner.debug == '1' && '--verbose' || '' }}
+
+    - name: Checkout w3c/json-ld-api
+      uses: actions/checkout@v6
+      with:
+        repository: w3c/json-ld-api
+        path: vender/json-ld-api
+
     - name: Run tests
+      env:
+        JSONLD_TEST_FIXTURES: ${{ github.workspace }}/vender/json-ld-api/tests/
       run: swift test --skip-build --disable-xctest --enable-code-coverage ${{ runner.debug == '1' && '--verbose' || '' }}
 
     - name: Generate lcov report
