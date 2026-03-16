@@ -37,16 +37,20 @@ extension JSONLDValue.ValueObject.ValueType {
     }
   }
 
+  init(_ value: String) throws(JSONLDError) {
+    guard !value.hasPrefix("_:") else {
+      throw .code(.invalidTypedValue)
+    }
+    self = .iriOrTerm(value)
+  }
+
   init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
       switch jsonValue {
-      case .string(let value): .iriOrTerm(value)
+      case .string(let value) where !value.hasPrefix("_:"): .iriOrTerm(value)
       case .null: .null
       default: throw .code(.invalidTypedValue)
       }
-    if case .iriOrTerm(let value) = self, value.hasPrefix("_:") {
-      throw .code(.invalidTypedValue)
-    }
   }
 }
 
@@ -94,6 +98,32 @@ extension JSONLDValue.ValueObject {
     }
 
     return jsonObject
+  }
+
+  init(value: Value, language: String? = nil, context: Contexts? = nil, index: String? = nil) {
+    self.value = value
+    self.context = context
+    self.index = index
+    self.language = language
+    self.type = nil
+  }
+
+  init(
+    value: Value,
+    type: String?,
+    context: Contexts? = nil,
+    index: String? = nil
+  ) throws(JSONLDError) {
+    self.value = value
+    self.context = context
+    self.index = index
+    self.type =
+      if let type {
+        try .init(type)
+      } else {
+        .null
+      }
+    self.language = nil
   }
 
   /// Creates a value object from a JSON object.

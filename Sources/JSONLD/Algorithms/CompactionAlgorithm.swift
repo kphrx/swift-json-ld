@@ -654,48 +654,14 @@ struct CompactionAlgorithm {
       }
     }
 
-    var best: String?
-    for def in self.termDefs.values
-    where !def.reverse && def.isSimpleTerm && iri.hasPrefix(def.iri) && iri != def.iri {
-      let suffix = String(iri.dropFirst(def.iri.count))
-      if suffix.hasPrefix("//") || suffix.isEmpty {
-        continue
-      }
-      let compact = "\(def.term):\(suffix)"
-      if best == nil || compact.count < best!.count
-        || (compact.count == best!.count && compact < best!)
-      {
-        best = compact
-      }
-    }
-    for def in self.termDefs.values
-    where !def.reverse && !def.isSimpleTerm && iri.hasPrefix(def.iri) && iri != def.iri {
-      let suffix = String(iri.dropFirst(def.iri.count))
-      if !suffix.hasPrefix("/") || suffix.hasPrefix("//") {
-        continue
-      }
-      let compact = "\(def.term):\(suffix)"
-      if best == nil || compact.count < best!.count
-        || (compact.count == best!.count && compact < best!)
-      {
-        best = compact
-      }
-    }
-
-    if includeVocab, let vocabMapping = self.vocabMapping, !vocabMapping.isEmpty,
-      iri.hasPrefix(vocabMapping)
-    {
-      let suffix = String(iri.dropFirst(vocabMapping.count))
-      if !suffix.isEmpty, JSONLDKeyword(rawValue: suffix) == nil, self.termDefs[suffix] == nil {
-        if best == nil || suffix.count < best!.count
-          || (suffix.count == best!.count && suffix < best!)
-        {
-          best = suffix
-        }
-      }
-    }
-
-    return best
+    return self.termDefs.values.compactMap {
+      guard !$0.reverse, iri.hasPrefix($0.iri), iri != $0.iri else { return nil }
+      let suffix = String(iri.dropFirst($0.iri.count))
+      guard !suffix.hasPrefix("//"),
+        $0.isSimpleTerm && !suffix.isEmpty || !$0.isSimpleTerm && suffix.hasPrefix("/")
+      else { return nil }
+      return "\($0.term):\(suffix)"
+    }.min { $0.count < $1.count || ($0.count == $1.count && $0 < $1) }
   }
 
   private func shouldUseRelativeCompactionForVocab(_ iri: String) -> Bool {

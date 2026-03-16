@@ -180,8 +180,7 @@ struct ActiveContext: Equatable, Sendable {
           defined[term] = true
           return
         case nil:
-          if term.contains(":") {
-            let colonIndex = term.firstIndex(of: ":")!
+          if let colonIndex = term.firstIndex(of: ":") {
             let prefix = String(term[..<colonIndex])
             if definition.terms[prefix] != nil {
               try self.defineTerm(definition, term: prefix, defined: &defined)
@@ -433,9 +432,12 @@ struct ActiveContext: Equatable, Sendable {
     guard let colonIndex = iri.firstIndex(of: ":"), colonIndex != iri.startIndex else {
       return false
     }
+
     let scheme = iri[..<colonIndex]
-    let first = scheme.first!
-    guard first.isLetter else { return false }
+    guard let first = scheme.first, first.isLetter else {
+      return false
+    }
+
     return scheme.allSatisfy { $0.isLetter || $0.isNumber || $0 == "+" || $0 == "-" || $0 == "." }
   }
 
