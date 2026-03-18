@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// A JSON-LD value that is parameterized by processing phase.
-public enum JSONLDValue<P: JSONLDPhase>: JSONLDValueProtocol, Equatable {
+public enum JSONLDValue<P: JSONLDPhase>: CustomJSONValueConvertible, Equatable {
   case node(NodeObject)
   case value(ValueObject)
   case setOrList(SetOrListObject)

@@ -3,7 +3,7 @@
 
 extension Contexts.ContextDefinition {
   /// A *context definition* value.
-  public enum Value: JSONLDValueProtocol, Equatable, Sendable {
+  public enum Value: CustomJSONValueConvertible, Equatable, Sendable {
     case null
     case keyword(JSONLDKeyword)
     case iriOrTerm(String)
@@ -99,7 +99,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
 
 extension Contexts.ContextDefinition {
   /// An *expanded term definition* object.
-  public enum ExpandedTermDefinition: JSONLDObjectProtocol, Equatable, Sendable {
+  public enum ExpandedTermDefinition: CustomJSONObjectConvertible, Equatable, Sendable {
     case standard(Standard)
     case reverse(Reverse)
   }
@@ -281,7 +281,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
   }
 
   /// The `@container` mapping for an *expanded term definition*.
-  public enum Container: JSONLDValueProtocol, Equatable, Sendable {
+  public enum Container: CustomJSONValueConvertible, Equatable, Sendable {
     case null
     case set
     case list
@@ -337,7 +337,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition {
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
   /// The `@id` mapping for an *expanded term definition*.
-  public enum Id: JSONLDValueProtocol, Equatable, Sendable {
+  public enum Id: CustomJSONValueConvertible, Equatable, Sendable {
     case null
     case keyword(JSONLDKeyword)
     case iriOrTerm(String)
@@ -411,7 +411,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.Reverse {
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
   /// The `@type` mapping for an *expanded term definition*.
-  public enum TermType: JSONLDValueProtocol, Equatable, Sendable {
+  public enum TermType: CustomJSONValueConvertible, Equatable, Sendable {
     case null
     case keyword(JSONLDKeyword)
     case iriOrTerm(String)
@@ -452,7 +452,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.TermType {
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
   /// The `@language` mapping for an *expanded term definition*.
-  public enum Language: JSONLDValueProtocol, Equatable, Sendable {
+  public enum Language: CustomJSONValueConvertible, Equatable, Sendable {
     case null
     case string(String)
   }
@@ -483,7 +483,7 @@ extension Contexts.ContextDefinition.ExpandedTermDefinition.Language {
 
 extension Contexts.ContextDefinition.ExpandedTermDefinition {
   /// The `@reverse` mapping for an *expanded term definition*.
-  public enum ReverseProperty: JSONLDValueProtocol, Equatable, Sendable {
+  public enum ReverseProperty: CustomJSONValueConvertible, Equatable, Sendable {
     case null
     case string(String)
   }

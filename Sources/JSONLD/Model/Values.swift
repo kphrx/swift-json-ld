@@ -15,7 +15,9 @@ public struct JSONLDValues<P: JSONLDPhase>: Equatable, CustomJSONValueConvertibl
   }
 
   init(validating jsonValue: JSONValue) throws(JSONLDError) {
-    self.init(try .init(from: jsonValue))
+    self.init(
+      try .init(from: jsonValue, mapper: JSONLDValue<P>.init(from:))
+    )
   }
 }
 
@@ -29,7 +31,7 @@ extension JSONLDValues: Decodable where P == Unresolved {
   }
 }
 
-extension JSONLDValues: JSONLDValueProtocol where P == Unresolved {
+extension JSONLDValues where P == Unresolved {
   /// Creates unresolved values from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     try self.init(validating: jsonValue)

@@ -140,37 +140,37 @@ enum ExpansionProcessor {
           } else {
             self.resolveDocumentRelativeIRI(value, baseIRI: activeContext.baseIRI)
           }
-        return try .node(.init(from: .object(["@id": .string(expandedId)])))
+        return try .node(.init(from: ["@id": .string(expandedId)]))
       }
       if typeMapping == "@vocab" {
         var expandedId = try activeContext.expandIRI(value, asVocab: true)
         if !expandedId.contains(":") {
           expandedId = try activeContext.expandIRI(expandedId, asDocumentRelative: true)
         }
-        return try .node(.init(from: .object(["@id": .string(expandedId)])))
+        return try .node(.init(from: ["@id": .string(expandedId)]))
       }
       return try .value(
-        .init(from: .object(["@value": .string(value), "@type": .string(typeMapping)]))
+        .init(from: ["@value": .string(value), "@type": .string(typeMapping)])
       )
     }
 
     if let languageMapping = activeContext.languageMapping(for: property) {
       return try .value(
-        .init(from: .object(["@value": .string(value), "@language": .string(languageMapping)]))
+        .init(from: ["@value": .string(value), "@language": .string(languageMapping)])
       )
     }
 
     if activeContext.hasLanguageMapping(for: property) {
-      return try .value(.init(from: .object(["@value": .string(value)])))
+      return try .value(.init(from: ["@value": .string(value)]))
     }
 
     if let defaultLanguage = activeContext.defaultLanguage {
       return try .value(
-        .init(from: .object(["@value": .string(value), "@language": .string(defaultLanguage)]))
+        .init(from: ["@value": .string(value), "@language": .string(defaultLanguage)])
       )
     }
 
-    return try .value(.init(from: .object(["@value": .string(value)])))
+    return try .value(.init(from: ["@value": .string(value)]))
   }
 
   private static func expandScalar(
@@ -186,14 +186,14 @@ enum ExpansionProcessor {
 
     if let typeMapping = activeContext.typeMapping(for: property) {
       if typeMapping == "@id" || typeMapping == "@vocab" {
-        return try .value(.init(from: .object(["@value": .integer(value)])))
+        return try .value(.init(from: ["@value": .integer(value)]))
       }
       return try .value(
-        .init(from: .object(["@value": .integer(value), "@type": .string(typeMapping)]))
+        .init(from: ["@value": .integer(value), "@type": .string(typeMapping)])
       )
     }
 
-    return try .value(.init(from: .object(["@value": .integer(value)])))
+    return try .value(.init(from: ["@value": .integer(value)]))
   }
 
   private static func expandScalar(
@@ -209,14 +209,14 @@ enum ExpansionProcessor {
 
     if let typeMapping = activeContext.typeMapping(for: property) {
       if typeMapping == "@id" || typeMapping == "@vocab" {
-        return try .value(.init(from: .object(["@value": .float(value)])))
+        return try .value(.init(from: ["@value": .float(value)]))
       }
       return try .value(
-        .init(from: .object(["@value": .float(value), "@type": .string(typeMapping)]))
+        .init(from: ["@value": .float(value), "@type": .string(typeMapping)])
       )
     }
 
-    return try .value(.init(from: .object(["@value": .float(value)])))
+    return try .value(.init(from: ["@value": .float(value)]))
   }
 
   private static func expandScalar(
@@ -232,14 +232,14 @@ enum ExpansionProcessor {
 
     if let typeMapping = activeContext.typeMapping(for: property) {
       if typeMapping == "@id" || typeMapping == "@vocab" {
-        return try .value(.init(from: .object(["@value": .boolean(value)])))
+        return try .value(.init(from: ["@value": .boolean(value)]))
       }
       return try .value(
-        .init(from: .object(["@value": .boolean(value), "@type": .string(typeMapping)]))
+        .init(from: ["@value": .boolean(value), "@type": .string(typeMapping)])
       )
     }
 
-    return try .value(.init(from: .object(["@value": .boolean(value)])))
+    return try .value(.init(from: ["@value": .boolean(value)]))
   }
 
   private static func expandNode(
@@ -269,7 +269,10 @@ enum ExpansionProcessor {
       combinedProperties["@index"] = .single(.iriOrTerm(index))
     }
     if let reverse = node.reverse {
-      combinedProperties["@reverse"] = try .init(from: reverse.jsonValue)
+      combinedProperties["@reverse"] = try .init(
+        from: reverse.jsonValue,
+        mapper: JSONLDValue<Unresolved>.init(from:)
+      )
     }
 
     return try await self.expandObject(
@@ -288,9 +291,10 @@ enum ExpansionProcessor {
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
   ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
-    let object = try value.jsonObject.mapValuesWithTypedThrows(
-      SingleOrMany<JSONLDValue<Unresolved>>.init(from:)
-    )
+    let object = try value.jsonObject.mapValuesWithTypedThrows {
+      jsonValue throws(JSONLDError) -> SingleOrMany<JSONLDValue<Unresolved>> in
+      try .init(from: jsonValue, mapper: JSONLDValue<Unresolved>.init(from:))
+    }
     return try await self.expandObject(
       activeContext,
       object: object,
@@ -362,7 +366,7 @@ enum ExpansionProcessor {
         guard case .string(let s) = val else { throw .code(.invalidLanguageMapValue) }
         expandedItems.append(
           try .value(
-            .init(from: .object(["@value": .string(s), "@language": .string(lang.lowercased())]))
+            .init(from: ["@value": .string(s), "@language": .string(lang.lowercased())])
           )
         )
       }
@@ -773,10 +777,10 @@ enum ExpansionProcessor {
           values.append(
             try .value(
               .init(
-                from: .object([
+                from: [
                   "@value": .string(s),
                   "@language": .string(lang.lowercased()),
-                ])
+                ]
               )
             )
           )
@@ -977,7 +981,7 @@ enum ExpansionProcessor {
         return nil
       }
 
-      return try .value(.init(from: .object(expandedProperties)))
+      return try .value(.init(from: expandedProperties))
     }
 
     if expandedProperties[.list] != nil {
@@ -988,7 +992,7 @@ enum ExpansionProcessor {
       if property == nil || property == "@graph" {
         return nil
       }
-      return try .setOrList(.init(from: .object(expandedProperties)))
+      return try .setOrList(.init(from: expandedProperties))
     }
 
     if let setVal = expandedProperties[.set] {
@@ -999,13 +1003,18 @@ enum ExpansionProcessor {
       if property == nil || property == "@graph" {
         return .setOrList(
           .init(
-            value: .set(try .init(from: setVal)),
+            value: .set(
+              try .init(
+                from: setVal,
+                mapper: JSONLDValue<Expanded>.SetOrListObject.Element.init(from:)
+              )
+            ),
             context: nil,
             index: nil,
           )
         )
       }
-      return try .setOrList(.init(from: .object(expandedProperties)))
+      return try .setOrList(.init(from: expandedProperties))
     }
 
     if property == nil || property == "@graph",
@@ -1038,7 +1047,7 @@ enum ExpansionProcessor {
       return nil
     }
 
-    return try .node(.init(from: .object(expandedProperties)))
+    return try .node(.init(from: expandedProperties))
   }
 
   private static func validateIRI(

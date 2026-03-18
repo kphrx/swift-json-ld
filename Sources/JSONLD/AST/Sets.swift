@@ -3,7 +3,7 @@
 
 extension JSONLDValue {
   /// A *set object* or *list object* in JSON-LD.
-  public struct SetOrListObject: JSONLDObjectProtocol, JSONLDValueProtocol, Equatable {
+  public struct SetOrListObject: CustomJSONObjectConvertible, Equatable {
     private typealias ValueEntry = (term: String?, value: Value)
     private typealias ContextEntry = (term: String?, value: Contexts)
     private typealias IndexEntry = (term: String?, value: String)
@@ -34,7 +34,7 @@ extension JSONLDValue.SetOrListObject {
   }
 
   /// An element contained in a `@set` or `@list`.
-  public enum Element: JSONLDValueProtocol, Equatable {
+  public enum Element: CustomJSONValueConvertible, Equatable {
     case string(String)
     case integer(Int)
     case float(Double)
@@ -153,13 +153,13 @@ extension JSONLDValue.SetOrListObject {
       case (.none, .none, _): throw .internalError(.notSetOrListObject)
       case (.some(let setValue), .none, true):
         .init(
-          value: .set(try .init(from: setValue)),
+          value: .set(try .init(from: setValue, mapper: Element.init(from:))),
           context: context,
           index: index,
         )
       case (.none, .some(let listValue), true):
         .init(
-          value: .list(try .init(from: listValue)),
+          value: .list(try .init(from: listValue, mapper: Element.init(from:))),
           context: context,
           index: index,
         )

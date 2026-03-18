@@ -25,7 +25,14 @@ public struct JSONLDDocument<P: JSONLDPhase>: Equatable, CustomJSONValueConverti
   }
 
   init(validating jsonValue: JSONValue) throws(JSONLDError) {
-    self.init(try .init(from: jsonValue))
+    self.init(
+      try .init(from: jsonValue) { jsonValue throws(JSONLDError) in
+        guard case .object(let jsonObject) = jsonValue else {
+          throw .internalError(.notObject)
+        }
+        return try .init(from: jsonObject)
+      }
+    )
   }
 
   /// Returns this document as a collection of JSON-LD values.
@@ -45,7 +52,7 @@ extension JSONLDDocument: Decodable where P == Unresolved {
   }
 }
 
-extension JSONLDDocument: JSONLDValueProtocol where P == Unresolved {
+extension JSONLDDocument where P == Unresolved {
   /// Creates an unresolved document from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     try self.init(validating: jsonValue)

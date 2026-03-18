@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// A JSON-LD `@context` value.
-public enum Contexts: JSONLDValueProtocol, Equatable, Sendable {
+public enum Contexts: CustomJSONValueConvertible, Equatable, Sendable {
   case null
   case single(Element)
   case array([Element])
@@ -24,7 +24,10 @@ extension Contexts {
       if case .null = jsonValue {
         .null
       } else {
-        switch try SingleOrMany<Element>(from: jsonValue) {
+        switch try SingleOrMany<Element>(
+          from: jsonValue,
+          mapper: Element.init(from:)
+        ) {
         case .single(let context): .single(context)
         case .many(let contexts): .array(contexts)
         }
@@ -74,7 +77,7 @@ extension Contexts: ExpressibleByDictionaryLiteral {
 
 extension Contexts {
   /// A single `@context` element.
-  public enum Element: JSONLDValueProtocol, Equatable, Sendable {
+  public enum Element: CustomJSONValueConvertible, Equatable, Sendable {
     case absoluteIRI(String)
     case relativeIRI(String)
     case contextDefinition(ContextDefinition)

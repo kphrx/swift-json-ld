@@ -3,7 +3,7 @@
 
 extension JSONLDValue {
   /// A *value object* in JSON-LD.
-  public struct ValueObject: JSONLDObjectProtocol, Equatable {
+  public struct ValueObject: CustomJSONObjectConvertible, Equatable {
     typealias ValueEntry = (term: String?, value: Value)
     typealias ContextEntry = (term: String?, value: Contexts)
     typealias TypeEntry = (term: String?, value: ValueType)
@@ -20,13 +20,13 @@ extension JSONLDValue {
 
 extension JSONLDValue.ValueObject {
   /// The `@type` value for a value object.
-  enum ValueType: JSONLDValueProtocol, Equatable {
+  enum ValueType: CustomJSONValueConvertible, Equatable {
     case iriOrTerm(String)
     case null
   }
 
   /// The `@value` payload of a value object.
-  enum Value: JSONLDValueProtocol, Equatable {
+  enum Value: CustomJSONValueConvertible, Equatable {
     case string(String)
     case integer(Int)
     case float(Double)

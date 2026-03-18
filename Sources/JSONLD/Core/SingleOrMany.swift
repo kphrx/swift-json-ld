@@ -43,17 +43,6 @@ extension SingleOrMany: CustomJSONValueConvertible where T: CustomJSONValueConve
   }
 }
 
-extension SingleOrMany: JSONLDValueProtocol where T: JSONLDValueProtocol {
-  init(from jsonArray: JSONArray) throws(JSONLDError) {
-    try self.init(from: jsonArray, mapper: T.init(from:))
-  }
-
-  /// Creates a single or many value from a JSON value.
-  public init(from jsonValue: JSONValue) throws(JSONLDError) {
-    try self.init(from: jsonValue, mapper: T.init(from:))
-  }
-}
-
 extension SingleOrMany: Sequence {
   /// Returns an iterator over the elements.
   public func makeIterator() -> AnyIterator<T> {

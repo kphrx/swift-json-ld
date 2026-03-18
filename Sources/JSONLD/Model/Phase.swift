@@ -6,7 +6,7 @@ public protocol JSONLDPhase: Sendable {
   /// The placeholder type used for unknown content in this phase.
   associatedtype UnknownContent: Equatable
   /// The allowed value type for `@reverse` in this phase.
-  associatedtype ReversePropertyValue: JSONLDValueProtocol & Equatable
+  associatedtype ReversePropertyValue: CustomJSONValueConvertible & Equatable
 
   /// Creates unknown content from a JSON object if the phase allows it.
   static func makeUnknown(from jsonObject: JSONObject) throws(JSONLDError) -> UnknownContent?
@@ -26,7 +26,9 @@ public enum Unresolved: JSONLDPhase {
   /// Creates unknown content from a JSON object.
   public static func makeUnknown(from jsonObject: JSONObject) throws(JSONLDError) -> UnknownContent?
   {
-    try jsonObject.mapValuesWithTypedThrows(SingleOrMany.init)
+    try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
+      try .init(from: jsonValue, mapper: JSONLDValue<Unresolved>.init(from:))
+    }
   }
 
   /// Creates a reverse property value from a JSON value.

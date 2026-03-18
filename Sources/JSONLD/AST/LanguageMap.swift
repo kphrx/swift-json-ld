@@ -3,14 +3,14 @@
 
 extension JSONLDValue {
   /// A *language map* object in JSON-LD.
-  public struct LanguageMap: JSONLDObjectProtocol, Equatable {
+  public struct LanguageMap: CustomJSONObjectConvertible, Equatable {
     let map: [String: SingleOrMany<Value>]
   }
 }
 
 extension JSONLDValue.LanguageMap {
   /// A value inside a *language map*.
-  public enum Value: JSONLDValueProtocol, Equatable {
+  public enum Value: CustomJSONValueConvertible, Equatable {
     case string(String)
     case null
   }
@@ -44,7 +44,7 @@ extension JSONLDValue.LanguageMap {
   /// Creates a language map from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
-      try .init(from: jsonValue)
+      try .init(from: jsonValue, mapper: Value.init(from:))
     }
   }
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// A JSON-LD keyword.
-public enum JSONLDKeyword: String, CaseIterable, JSONLDValueProtocol, Sendable {
+public enum JSONLDKeyword: String, CaseIterable, CustomJSONValueConvertible, Sendable {
   case base = "@base"
   case container = "@container"
   case context = "@context"

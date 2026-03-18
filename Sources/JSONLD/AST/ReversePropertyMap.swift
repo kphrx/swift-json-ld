@@ -1,7 +1,7 @@
 // Copyright 2026 kPherox
 // SPDX-License-Identifier: Apache-2.0
 
-struct ReversePropertyMap<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
+struct ReversePropertyMap<P: JSONLDPhase>: CustomJSONObjectConvertible, Equatable {
   let map: [String: SingleOrMany<P.ReversePropertyValue>]
 
   var jsonObject: JSONObject {

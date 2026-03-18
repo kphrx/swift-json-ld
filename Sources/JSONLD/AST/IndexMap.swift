@@ -3,14 +3,14 @@
 
 extension JSONLDValue {
   /// An *index map* object in JSON-LD.
-  public struct IndexMap: JSONLDObjectProtocol, Equatable {
+  public struct IndexMap: CustomJSONObjectConvertible, Equatable {
     let map: [String: SingleOrMany<Value>]
   }
 }
 
 extension JSONLDValue.IndexMap {
   /// A value inside an *index map*.
-  public enum Value: JSONLDValueProtocol, Equatable {
+  public enum Value: CustomJSONValueConvertible, Equatable {
     case string(String)
     case integer(Int)
     case float(Double)
@@ -72,7 +72,7 @@ extension JSONLDValue.IndexMap {
   /// Creates an index map from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
-      try .init(from: jsonValue)
+      try .init(from: jsonValue, mapper: Value.init(from:))
     }
   }
 }

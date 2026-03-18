@@ -3,7 +3,7 @@
 
 extension JSONLDValue {
   /// A *node object* in JSON-LD.
-  public struct NodeObject: JSONLDObjectProtocol, Equatable {
+  public struct NodeObject: CustomJSONObjectConvertible, Equatable {
     typealias ContextEntry = (term: String?, value: Contexts)
     typealias IdEntry = (term: String?, value: String)
     typealias GraphEntry = (term: String?, value: SingleOrMany<JSONLDValue<P>>)
@@ -159,7 +159,9 @@ extension JSONLDValue.NodeObject {
 
     self.indexEntry = try properties.extractIndex().map { (term: nil, value: $0) }
 
-    self.properties = try properties.mapValuesWithTypedThrows(SingleOrMany.init(from:))
+    self.properties = try properties.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
+      try .init(from: jsonValue, mapper: JSONLDValue<P>.init(from:))
+    }
   }
 }
 

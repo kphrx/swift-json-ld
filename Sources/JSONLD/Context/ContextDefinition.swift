@@ -3,7 +3,7 @@
 
 extension Contexts {
   /// A JSON-LD *context definition* object.
-  public struct ContextDefinition: JSONLDObjectProtocol, Equatable, Sendable {
+  public struct ContextDefinition: CustomJSONObjectConvertible, Equatable, Sendable {
     let baseIRI: BaseIRI?
     let vocabMapping: VocabMapping?
     let defaultLanguage: DefaultLanguage?
@@ -63,7 +63,7 @@ extension Contexts.ContextDefinition {
 }
 
 extension Contexts.ContextDefinition {
-  enum BaseIRI: JSONLDValueProtocol, Equatable, Sendable {
+  enum BaseIRI: CustomJSONValueConvertible, Equatable, Sendable {
     case null
     case string(String)
 
@@ -87,7 +87,7 @@ extension Contexts.ContextDefinition {
     }
   }
 
-  enum VocabMapping: JSONLDValueProtocol, Equatable, Sendable {
+  enum VocabMapping: CustomJSONValueConvertible, Equatable, Sendable {
     case null
     case string(String)
 
@@ -111,7 +111,7 @@ extension Contexts.ContextDefinition {
     }
   }
 
-  enum DefaultLanguage: JSONLDValueProtocol, Equatable, Sendable {
+  enum DefaultLanguage: CustomJSONValueConvertible, Equatable, Sendable {
     case null
     case string(String)
 
