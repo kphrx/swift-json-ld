@@ -2,6 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension JSONObject {
+  mutating func set<T: CustomJSONValueConvertible>(
+    _ value: T?,
+    for keyword: JSONLDKeyword,
+    term: String?
+  ) {
+    guard let value else {
+      return
+    }
+    self[term ?? keyword.rawValue] = value.jsonValue
+  }
+
   mutating func removeValue(for keyword: JSONLDKeyword) -> JSONValue? {
     self.removeValue(forKey: keyword.rawValue)
   }

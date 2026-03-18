@@ -1242,7 +1242,7 @@ struct CompactionAlgorithm {
         }
       }
     case .setOrList(let setOrList):
-      for child in setOrList.setOrListValues {
+      for child in setOrList.value {
         try Self.validateInvalidCompactionInput(.init(child))
       }
     case .indexMap(let indexMap):

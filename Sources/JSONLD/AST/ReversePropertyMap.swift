@@ -8,6 +8,10 @@ struct ReversePropertyMap<P: JSONLDPhase>: JSONLDObjectProtocol, Equatable {
     self.map.jsonObject
   }
 
+  init(map: [String: SingleOrMany<P.ReversePropertyValue>]) {
+    self.map = map
+  }
+
   init(from jsonObject: JSONObject) throws(JSONLDError) {
     var map: [String: SingleOrMany<P.ReversePropertyValue>] = [:]
 

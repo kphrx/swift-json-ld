@@ -25,7 +25,9 @@ enum ExpansionProcessor {
         continue
       }
 
-      if case .setOrList(.set(let values, _, _)) = expanded {
+      if case .setOrList(let setOrList) = expanded,
+        case .set(let values) = setOrList.value
+      {
         result.append(contentsOf: values.map { .init($0) })
       } else {
         result.append(expanded)
@@ -305,8 +307,9 @@ enum ExpansionProcessor {
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
   ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
-    switch setOrList {
-    case .set(let values, _, let index):
+    let indexValue = setOrList.index
+    switch setOrList.value {
+    case .set(let values):
       let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
       let expanded = try await self.expand(
         activeContext,
@@ -315,10 +318,14 @@ enum ExpansionProcessor {
         insideList: insideList,
         loader: loader
       )
-      return try .setOrList(
-        .set(.many(expanded.map { .init($0) }), context: nil, index: index)
+      return .setOrList(
+        .init(
+          value: .set(.many(expanded.map { .init($0) })),
+          context: nil,
+          index: indexValue,
+        )
       )
-    case .list(let values, _, let index):
+    case .list(let values):
       if insideList { throw .code(.listOfLists) }
       let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
       let expanded = try await self.expand(
@@ -330,13 +337,17 @@ enum ExpansionProcessor {
       )
 
       for item in expanded {
-        if case .setOrList(.list) = item {
+        if case .setOrList(let object) = item, case .list = object.value {
           throw .code(.listOfLists)
         }
       }
 
-      return try .setOrList(
-        .list(.many(expanded.map { .init($0) }), context: nil, index: index)
+      return .setOrList(
+        .init(
+          value: .list(.many(expanded.map { .init($0) })),
+          context: nil,
+          index: indexValue,
+        )
       )
     }
   }
@@ -357,7 +368,11 @@ enum ExpansionProcessor {
       }
     }
     return .setOrList(
-      .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil)
+      .init(
+        value: .set(.many(expandedItems.map { .init($0) })),
+        context: nil,
+        index: nil,
+      )
     )
   }
 
@@ -381,7 +396,11 @@ enum ExpansionProcessor {
       expandedItems.append(contentsOf: expanded)
     }
     return .setOrList(
-      .set(.many(expandedItems.map { .init($0) }), context: nil, index: nil)
+      .init(
+        value: .set(.many(expandedItems.map { .init($0) })),
+        context: nil,
+        index: nil,
+      )
     )
   }
 
@@ -578,7 +597,7 @@ enum ExpansionProcessor {
     )
 
     for item in expandedList {
-      if case .setOrList(.list) = item {
+      if case .setOrList(let object) = item, case .list = object.value {
         throw .code(.listOfLists)
       }
     }
@@ -824,7 +843,7 @@ enum ExpansionProcessor {
     if shouldIncludeProperty {
       if container == .list, case .many = value,
         expandedValues.contains(where: {
-          if case .setOrList(.list) = $0 { true } else { false }
+          if case .setOrList(let object) = $0, case .list = object.value { true } else { false }
         })
       {
         throw .code(.listOfLists)
@@ -978,7 +997,13 @@ enum ExpansionProcessor {
       }
       // If property is null or @graph, and it's a set object, return its @set value.
       if property == nil || property == "@graph" {
-        return try .setOrList(.set(.init(from: setVal), context: nil, index: nil))
+        return .setOrList(
+          .init(
+            value: .set(try .init(from: setVal)),
+            context: nil,
+            index: nil,
+          )
+        )
       }
       return try .setOrList(.init(from: .object(expandedProperties)))
     }
@@ -1027,7 +1052,10 @@ enum ExpansionProcessor {
   }
 
   private static func listItems(for values: [JSONLDValue<Expanded>]) -> [JSONValue] {
-    if values.count == 1, case .setOrList(.list(let listValues, _, _)) = values[0] {
+    if values.count == 1,
+      case .setOrList(let object) = values[0],
+      case .list(let listValues) = object.value
+    {
       listValues.map(\.jsonValue)
     } else {
       values.map(\.jsonValue)

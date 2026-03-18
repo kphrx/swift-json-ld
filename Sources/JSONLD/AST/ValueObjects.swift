@@ -4,11 +4,17 @@
 extension JSONLDValue {
   /// A *value object* in JSON-LD.
   public struct ValueObject: JSONLDObjectProtocol, Equatable {
-    let value: Value
-    let context: Contexts?
-    let type: ValueType?
-    let language: String?
-    let index: String?
+    typealias ValueEntry = (term: String?, value: Value)
+    typealias ContextEntry = (term: String?, value: Contexts)
+    typealias TypeEntry = (term: String?, value: ValueType)
+    typealias LanguageEntry = (term: String?, value: String)
+    typealias IndexEntry = (term: String?, value: String)
+
+    let valueEntry: ValueEntry
+    let contextEntry: ContextEntry?
+    let typeEntry: TypeEntry?
+    let languageEntry: LanguageEntry?
+    let indexEntry: IndexEntry?
   }
 }
 
@@ -26,6 +32,21 @@ extension JSONLDValue.ValueObject {
     case float(Double)
     case boolean(Bool)
     case null
+  }
+}
+
+extension JSONLDValue.ValueObject {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.valueEntry.term == rhs.valueEntry.term
+      && lhs.valueEntry.value == rhs.valueEntry.value
+      && lhs.contextEntry?.term == rhs.contextEntry?.term
+      && lhs.contextEntry?.value == rhs.contextEntry?.value
+      && lhs.typeEntry?.term == rhs.typeEntry?.term
+      && lhs.typeEntry?.value == rhs.typeEntry?.value
+      && lhs.languageEntry?.term == rhs.languageEntry?.term
+      && lhs.languageEntry?.value == rhs.languageEntry?.value
+      && lhs.indexEntry?.term == rhs.indexEntry?.term
+      && lhs.indexEntry?.value == rhs.indexEntry?.value
   }
 }
 
@@ -79,33 +100,53 @@ extension JSONLDValue.ValueObject.Value {
 }
 
 extension JSONLDValue.ValueObject {
+  var value: Value {
+    self.valueEntry.value
+  }
+
+  var context: Contexts? {
+    self.contextEntry?.value
+  }
+
+  var type: ValueType? {
+    self.typeEntry?.value
+  }
+
+  var language: String? {
+    self.languageEntry?.value
+  }
+
+  var index: String? {
+    self.indexEntry?.value
+  }
+
   /// Returns this value object as a JSON object.
   public var jsonObject: JSONObject {
     var jsonObject: JSONObject = [:]
 
-    jsonObject[.value] = self.value.jsonValue
+    jsonObject.set(self.valueEntry.value, for: .value, term: self.valueEntry.term)
 
-    if let type = self.type {
-      jsonObject[.type] = type.jsonValue
+    if let typeEntry = self.typeEntry {
+      jsonObject.set(typeEntry.value, for: .type, term: typeEntry.term)
     }
 
-    if let language = self.language {
-      jsonObject[.language] = .string(language)
+    if let languageEntry = self.languageEntry {
+      jsonObject.set(languageEntry.value, for: .language, term: languageEntry.term)
     }
 
-    if let index = self.index {
-      jsonObject[.index] = .string(index)
+    if let indexEntry = self.indexEntry {
+      jsonObject.set(indexEntry.value, for: .index, term: indexEntry.term)
     }
 
     return jsonObject
   }
 
   init(value: Value, language: String? = nil, context: Contexts? = nil, index: String? = nil) {
-    self.value = value
-    self.context = context
-    self.index = index
-    self.language = language
-    self.type = nil
+    self.valueEntry = (term: nil, value: value)
+    self.contextEntry = context.map { (term: nil, value: $0) }
+    self.indexEntry = index.map { (term: nil, value: $0) }
+    self.languageEntry = language.map { (term: nil, value: $0) }
+    self.typeEntry = nil
   }
 
   init(
@@ -114,16 +155,30 @@ extension JSONLDValue.ValueObject {
     context: Contexts? = nil,
     index: String? = nil
   ) throws(JSONLDError) {
-    self.value = value
-    self.context = context
-    self.index = index
-    self.type =
+    self.valueEntry = (term: nil, value: value)
+    self.contextEntry = context.map { (term: nil, value: $0) }
+    self.indexEntry = index.map { (term: nil, value: $0) }
+    self.typeEntry =
       if let type {
-        try .init(type)
+        (term: nil, value: try .init(type))
       } else {
-        .null
+        (term: nil, value: .null)
       }
-    self.language = nil
+    self.languageEntry = nil
+  }
+
+  init(
+    value: ValueEntry,
+    type: TypeEntry? = nil,
+    language: LanguageEntry? = nil,
+    context: ContextEntry? = nil,
+    index: IndexEntry? = nil
+  ) {
+    self.valueEntry = value
+    self.typeEntry = type
+    self.languageEntry = language
+    self.contextEntry = context
+    self.indexEntry = index
   }
 
   /// Creates a value object from a JSON object.
@@ -132,9 +187,9 @@ extension JSONLDValue.ValueObject {
     guard let value = properties.removeValue(for: .value) else {
       throw .internalError(.notValueObject)
     }
-    self.value = try .init(from: value)
+    self.valueEntry = (term: nil, value: try .init(from: value))
 
-    self.context = try properties.extractContext()
+    self.contextEntry = try properties.extractContext().map { (term: nil, value: $0) }
 
     let typeValue = properties.removeValue(for: .type)
     let languageValue = properties.removeValue(for: .language)
@@ -143,28 +198,28 @@ extension JSONLDValue.ValueObject {
       guard case .string(let language) = languageValue else {
         throw .code(.invalidLanguageTaggedString)
       }
-      self.language = language
+      self.languageEntry = (term: nil, value: language)
     } else {
-      self.language = nil
+      self.languageEntry = nil
     }
 
     if let typeValue {
       if languageValue != nil {
         throw .code(.invalidValueObject)
       }
-      self.type = try .init(from: typeValue)
+      self.typeEntry = (term: nil, value: try .init(from: typeValue))
     } else {
-      self.type = nil
+      self.typeEntry = nil
     }
 
-    self.index = try properties.extractIndex()
+    self.indexEntry = try properties.extractIndex().map { (term: nil, value: $0) }
 
     if !properties.isEmpty {
       throw .code(.invalidValueObject)
     }
 
-    if self.language != nil {
-      switch self.value {
+    if self.languageEntry != nil {
+      switch self.valueEntry.value {
       case .string: break
       default: throw .code(.invalidLanguageTaggedValue)
       }
