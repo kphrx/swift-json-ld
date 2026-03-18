@@ -26,3 +26,9 @@ extension JSONObject {
     self.keys.contains(keyword.rawValue)
   }
 }
+
+extension JSONValue {
+  subscript(_ keyword: JSONLDKeyword) -> JSONValue? {
+    self[keyword.rawValue]
+  }
+}

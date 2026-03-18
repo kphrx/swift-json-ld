@@ -10,13 +10,15 @@ struct CompactionAlgorithm {
     let compactToRelative: Bool
   }
 
+  private typealias Container = Contexts.ContextDefinition.ExpandedTermDefinition.Container
+
   private struct TermDef {
     let term: String
     let iri: String
     let type: String?
     let language: String?
     let languageDefined: Bool
-    let container: String?
+    let container: Container?
     let reverse: Bool
     let isSimpleTerm: Bool
   }
@@ -25,7 +27,7 @@ struct CompactionAlgorithm {
   private let contextValue: JSONValue
   private let termDefs: [String: TermDef]
   private let iriToTerms: [String: [TermDef]]
-  private let keywordAliases: [String: String]
+  private let keywordAliases: [JSONLDKeyword: String]
   private let vocabMapping: String?
   private let baseIRI: String?
   private let defaultLanguage: String?
@@ -34,25 +36,27 @@ struct CompactionAlgorithm {
     self.options = options
     self.contextValue = contextValue
     let contextObject = Self.mergedContextObject(from: self.contextValue)
-    self.baseIRI = Self.stringValue(contextObject[JSONLDKeyword.base.rawValue]) ?? options.baseIRI
+    self.baseIRI = Self.stringValue(contextObject[.base]) ?? options.baseIRI
     self.vocabMapping = Self.resolveVocabMapping(contextObject, baseIRI: self.baseIRI)
-    self.defaultLanguage = Self.stringValue(contextObject[JSONLDKeyword.language.rawValue])?
+    self.defaultLanguage = Self.stringValue(contextObject[.language])?
       .lowercased()
 
     let simpleTerms = Self.simpleTerms(from: contextObject)
     let termDefs = Self.termDefinitions(from: activeContext, simpleTerms: simpleTerms)
     self.termDefs = Dictionary(uniqueKeysWithValues: termDefs.map { ($0.term, $0) })
 
-    var iriMap: [String: [TermDef]] = [:]
-    var keywordAliases: [String: String] = [:]
-    for def in termDefs {
-      iriMap[def.iri, default: []].append(def)
-      if JSONLDKeyword(rawValue: def.iri) != nil {
-        keywordAliases[def.iri] = keywordAliases[def.iri].map { min($0, def.term) } ?? def.term
+    self.iriToTerms = .init(grouping: termDefs) { $0.iri }
+    self.keywordAliases = .init(
+      uniqueKeysWithValues: self.iriToTerms.compactMap { key, value in
+        if let keyword = JSONLDKeyword(rawValue: key),
+          let term = value.min(by: { $0.term < $1.term })?.term
+        {
+          (keyword, term)
+        } else {
+          nil
+        }
       }
-    }
-    self.iriToTerms = iriMap
-    self.keywordAliases = keywordAliases
+    )
   }
 
   private static func termDefinitions(
@@ -60,13 +64,19 @@ struct CompactionAlgorithm {
     simpleTerms: Set<String>
   ) -> [TermDef] {
     activeContext.termDefinitions.map { term, definition in
-      .init(
+      let container: Container? =
+        if definition.containerMapping == .null {
+          nil
+        } else {
+          definition.containerMapping
+        }
+      return TermDef(
         term: term,
         iri: definition.iri,
         type: definition.typeMapping,
         language: definition.languageMapping,
         languageDefined: definition.languageMappingDefined,
-        container: definition.containerMapping.keyword?.rawValue,
+        container: container,
         reverse: definition.reverse,
         isSimpleTerm: simpleTerms.contains(term)
       )
@@ -76,9 +86,11 @@ struct CompactionAlgorithm {
   private static func simpleTerms(from context: JSONObject) -> Set<String> {
     Set(
       context.compactMap { key, value in
-        if key.hasPrefix("@") { return nil }
-        if case .string = value { return key }
-        return nil
+        if case .string = value, !key.hasPrefix("@") {
+          key
+        } else {
+          nil
+        }
       }
     )
   }
@@ -93,239 +105,267 @@ struct CompactionAlgorithm {
       default: [input]
       }
 
-    var compactedItems: [JSONValue] = []
+    var compactedItems: [JSONLDValue<Compacted>] = []
     compactedItems.reserveCapacity(elements.count)
     for value in elements {
       if let compacted = try self.compactElement(value, activeProperty: nil) {
-        if case .object(let object) = compacted, self.isTopLevelFreeFloatingNode(object) {
-          continue
+        for item in compacted.values {
+          if case .node(let node) = item, self.isTopLevelFreeFloatingNode(node) {
+            continue
+          }
+          compactedItems.append(item)
         }
-        compactedItems.append(compacted)
       }
     }
 
-    let compacted: JSONValue =
-      if compactedItems.isEmpty {
-        .object([:])
-      } else if !self.options.compactArrays {
-        .object([self.alias(for: JSONLDKeyword.graph.rawValue): .array(compactedItems)])
-      } else if compactedItems.count == 1 {
-        compactedItems[0]
-      } else {
-        .object([self.alias(for: JSONLDKeyword.graph.rawValue): .array(compactedItems)])
-      }
-
-    guard case .object(var object) = compacted else {
-      return try .init(validating: compacted)
+    if compactedItems.isEmpty {
+      return .init(.single(.init()))
     }
 
-    if !object.isEmpty {
-      if Self.isMeaningfulContext(self.contextValue) {
-        object[self.alias(for: JSONLDKeyword.context.rawValue)] = self.contextValue
-      }
+    if !self.options.compactArrays || compactedItems.count != 1 {
+      let graphEntry: JSONLDValue<Compacted>.NodeObject.GraphEntry = (
+        term: self.term(for: .graph),
+        value: .many(compactedItems)
+      )
+      let node = try self.addTopLevelContext(
+        .init(graph: graphEntry)
+      )
+      return .init(.single(node))
     }
-    return try .init(validating: .object(object))
+
+    let item = compactedItems[0]
+    return switch item {
+    case .node(let node):
+      .init(.single(try self.addTopLevelContext(node)))
+    default:
+      try .init(validating: item.jsonValue)
+    }
   }
 
   private func compactElement(
     _ value: JSONValue,
     activeProperty: String?
-  ) throws(JSONLDError) -> JSONValue? {
+  ) throws(JSONLDError) -> CompactedItem? {
     switch value {
     case .null:
       return nil
     case .array(let array):
-      var compacted: [JSONValue] = []
+      var compacted: [JSONLDValue<Compacted>] = []
       compacted.reserveCapacity(array.count)
       for item in array {
         if let value = try self.compactElement(item, activeProperty: activeProperty) {
-          compacted.append(value)
+          compacted.append(contentsOf: value.values)
         }
       }
-      if self.options.compactArrays && compacted.count == 1 {
-        return compacted[0]
+      return if self.options.compactArrays && compacted.count == 1 {
+        .single(compacted[0])
+      } else {
+        .array(compacted)
       }
-      return .array(compacted)
     case .object(let object):
-      if object[JSONLDKeyword.value.rawValue] != nil {
-        return try self.compactValueObject(object, activeProperty: activeProperty)
+      if object[.value] != nil {
+        return .single(try self.compactValueObject(object, activeProperty: activeProperty))
       }
-      if let list = object[JSONLDKeyword.list.rawValue] {
-        guard case .array(let items) = list else { return .object(object) }
+      if let list = object[.list] {
+        guard case .array(let items) = list else {
+          return .single(.setOrList(try .init(from: object)))
+        }
         if items.contains(where: Self.isListObject) {
           throw .code(.compactionToListOfLists)
         }
-        var compactedItems: [JSONValue] = []
+        var compactedItems: [JSONLDValue<Compacted>] = []
         compactedItems.reserveCapacity(items.count)
         for item in items {
           if let compacted = try self.compactElement(item, activeProperty: activeProperty) {
-            compactedItems.append(compacted)
+            if compacted.isArray {
+              throw .code(.compactionToListOfLists)
+            }
+            if compacted.values.contains(where: Self.isListObject) {
+              throw .code(.compactionToListOfLists)
+            }
+            compactedItems.append(contentsOf: compacted.values)
           }
         }
-        if compactedItems.contains(where: {
-          if case .object(let obj) = $0, obj[self.alias(for: JSONLDKeyword.list.rawValue)] != nil {
-            return true
-          }
-          if case .array = $0 {
-            return true
-          }
-          return false
-        }) {
-          throw .code(.compactionToListOfLists)
-        }
-        let hasIndex = object[JSONLDKeyword.index.rawValue] != nil
+        let hasIndex = object[.index] != nil
         if let property = activeProperty,
           let def = self.termDefs[property],
-          def.container == JSONLDKeyword.list.rawValue,
+          def.container == .list,
           !hasIndex
         {
-          if self.options.compactArrays && compactedItems.count == 1 {
-            return compactedItems[0]
+          return if self.options.compactArrays && compactedItems.count == 1 {
+            .single(compactedItems[0])
+          } else {
+            .array(compactedItems)
           }
-          return .array(compactedItems)
         }
-        var compactedObject: JSONObject = [
-          self.alias(for: JSONLDKeyword.list.rawValue): .array(compactedItems)
-        ]
-        if let index = object[JSONLDKeyword.index.rawValue] {
-          compactedObject[self.alias(for: JSONLDKeyword.index.rawValue)] = index
-        }
-        return .object(compactedObject)
+        let elements = try compactedItems.map(Self.setOrListElement(from:))
+        let indexValue = Self.stringValue(object[.index])
+        let indexTerm = indexValue.flatMap { _ in self.term(for: .index) }
+        return .single(
+          .setOrList(
+            .init(
+              term: self.term(for: .list),
+              value: .list(.many(elements)),
+              index: indexValue,
+              indexTerm: indexTerm
+            )
+          )
+        )
       }
-      if let set = object[JSONLDKeyword.set.rawValue] {
-        guard case .array(let items) = set else { return .object(object) }
-        var compactedItems: [JSONValue] = []
+      if let set = object[.set] {
+        guard case .array(let items) = set else {
+          return .single(.setOrList(try .init(from: object)))
+        }
+        var compactedItems: [JSONLDValue<Compacted>] = []
         compactedItems.reserveCapacity(items.count)
         for item in items {
           if let compacted = try self.compactElement(item, activeProperty: activeProperty) {
-            if compacted != .null {
-              compactedItems.append(compacted)
+            if !compacted.isNullSingle {
+              compactedItems.append(contentsOf: compacted.values)
             }
           }
         }
-        if let property = activeProperty,
-          let def = self.termDefs[property],
-          def.container == JSONLDKeyword.set.rawValue
-        {
-          return .array(compactedItems)
-        }
         return .array(compactedItems)
       }
-      if object[JSONLDKeyword.id.rawValue] != nil && object.count == 1 {
-        let id = Self.stringValue(object[JSONLDKeyword.id.rawValue]) ?? ""
+      if object[.id] != nil && object.count == 1 {
+        let id = Self.stringValue(object[.id]) ?? ""
         if let property = activeProperty,
           let def = self.termDefs[property]
         {
           if def.type == JSONLDKeyword.vocab.rawValue {
-            return .string(self.compactIRI(id, vocab: true))
+            return .single(.iriOrTerm(self.compactIRI(id, vocab: true)))
           }
           if def.type == JSONLDKeyword.id.rawValue {
-            return .string(self.compactIRI(id, vocab: false))
+            return .single(.iriOrTerm(self.compactIRI(id, vocab: false)))
           }
         }
       }
-      return try self.compactNodeObject(object)
+      return .single(.node(try self.compactNodeObject(object)))
     default:
-      return value
+      return .single(Self.compactedScalarValue(from: value))
     }
   }
 
-  private func compactNodeObject(_ object: JSONObject) throws(JSONLDError) -> JSONValue {
-    var result: JSONObject = [:]
+  private struct NodeBuilder {
+    var context: JSONLDValue<Compacted>.NodeObject.ContextEntry?
+    var id: JSONLDValue<Compacted>.NodeObject.IdEntry?
+    var graph: JSONLDValue<Compacted>.NodeObject.GraphEntry?
+    var type: JSONLDValue<Compacted>.NodeObject.TypeEntry?
+    var reverse: JSONLDValue<Compacted>.NodeObject.ReverseEntry?
+    var index: JSONLDValue<Compacted>.NodeObject.IndexEntry?
+    var properties: [String: SingleOrMany<JSONLDValue<Compacted>>] = [:]
+  }
+
+  private func compactNodeObject(
+    _ object: JSONObject
+  ) throws(JSONLDError) -> JSONLDValue<Compacted>.NodeObject {
+    var builder = NodeBuilder()
     for (expandedProperty, expandedValue) in object.sorted(by: { $0.key < $1.key }) {
       switch JSONLDKeyword(rawValue: expandedProperty) {
       case .id?:
-        self.compactIdKeyword(expandedValue, into: &result, key: expandedProperty)
+        self.compactIdKeyword(expandedValue, into: &builder)
 
       case .type?:
-        self.compactTypeKeyword(expandedValue, into: &result, key: expandedProperty)
+        self.compactTypeKeyword(expandedValue, into: &builder)
 
       case .index?:
-        self.compactIndexKeyword(expandedValue, into: &result, key: expandedProperty)
+        self.compactIndexKeyword(expandedValue, into: &builder)
 
       case .graph?:
-        try self.compactGraphKeyword(expandedValue, into: &result, key: expandedProperty)
+        try self.compactGraphKeyword(expandedValue, into: &builder)
 
       case .reverse?:
-        try self.compactReverseKeyword(expandedValue, into: &result)
+        try self.compactReverseKeyword(expandedValue, into: &builder)
 
       case nil:
-        try self.compactProperty(expandedValue, into: &result, expandedProperty: expandedProperty)
+        try self.compactProperty(
+          expandedValue,
+          into: &builder,
+          expandedProperty: expandedProperty
+        )
 
       default:
         continue
       }
     }
 
-    return .object(result)
+    return .init(
+      context: builder.context,
+      id: builder.id,
+      graph: builder.graph,
+      type: builder.type,
+      reverse: builder.reverse,
+      index: builder.index,
+      properties: builder.properties
+    )
   }
 
   private func compactIdKeyword(
     _ value: JSONValue,
-    into result: inout JSONObject,
-    key: String
+    into builder: inout NodeBuilder,
   ) {
-    let alias = self.alias(for: key)
     if let id = Self.stringValue(value) {
-      result[alias] = .string(self.compactIRI(id, vocab: false))
+      builder.id = (term: self.term(for: .id), value: self.compactIRI(id, vocab: false))
     }
   }
 
   private func compactTypeKeyword(
     _ value: JSONValue,
-    into result: inout JSONObject,
-    key: String
+    into builder: inout NodeBuilder,
   ) {
-    let alias = self.alias(for: key)
     if case .array(let types) = value {
       let compactedTypes = types.compactMap(Self.stringValue).map {
         self.compactIRI($0, vocab: true)
       }
-      if self.options.compactArrays, compactedTypes.count == 1 {
-        result[alias] = .string(compactedTypes[0])
-      } else {
-        result[alias] = .array(compactedTypes.map(JSONValue.string))
-      }
+      let typeValue: SingleOrMany<String> =
+        if self.options.compactArrays, compactedTypes.count == 1 {
+          .single(compactedTypes[0])
+        } else {
+          .many(compactedTypes)
+        }
+      builder.type = (term: self.term(for: .type), value: typeValue)
     }
   }
 
   private func compactIndexKeyword(
     _ value: JSONValue,
-    into result: inout JSONObject,
-    key: String
+    into builder: inout NodeBuilder,
   ) {
-    result[self.alias(for: key)] = value
+    if let index = Self.stringValue(value) {
+      builder.index = (term: self.term(for: .index), value: index)
+    }
   }
 
   private func compactGraphKeyword(
     _ value: JSONValue,
-    into result: inout JSONObject,
-    key: String
+    into builder: inout NodeBuilder,
   ) throws(JSONLDError) {
-    let alias = self.alias(for: key)
     let values =
       switch value {
       case .array(let values): values
       default: [value]
       }
-    var compacted: [JSONValue] = []
+    var compacted: [JSONLDValue<Compacted>] = []
     compacted.reserveCapacity(values.count)
     for v in values {
-      if let item = try self.compactElement(v, activeProperty: alias) {
-        compacted.append(item)
+      if let item = try self.compactElement(
+        v,
+        activeProperty: self.term(for: .graph) ?? JSONLDKeyword.graph.rawValue
+      ) {
+        compacted.append(contentsOf: item.values)
       }
     }
-    result[alias] = .array(compacted)
+    builder.graph = (term: self.term(for: .graph), value: .many(compacted))
   }
 
   private func compactReverseKeyword(
     _ value: JSONValue,
-    into result: inout JSONObject
+    into builder: inout NodeBuilder
   ) throws(JSONLDError) {
     guard case .object(let reverseObject) = value else {
       throw .code(.invalidReversePropertyMap)
     }
-    var compactedReverse: JSONObject = [:]
+    var compactedReverse: [String: SingleOrMany<JSONLDValue<Compacted>>] = [:]
     for (reverseProperty, reverseValue) in reverseObject {
       guard case .array(let values) = reverseValue else { continue }
 
@@ -341,49 +381,57 @@ struct CompactionAlgorithm {
 
         if self.termDefs[term]?.reverse == true {
           let def = self.termDefs[term]
-          let existingValues = Self.arrayValue(result[term])
+          let existingValues = Self.arrayValue(builder.properties[term])
           let mergedValues = existingValues + compactedValues
 
-          if def?.container == JSONLDKeyword.index.rawValue,
+          if def?.container == .index,
             let indexMap = try self.compactIndexMap(originalValues, activeProperty: term)
           {
-            result[term] = .object(indexMap)
+            builder.properties[term] = .single(.indexMap(indexMap))
             continue
           }
 
-          result[term] =
-            if self.options.compactArrays && mergedValues.count == 1
-              && def?.container != JSONLDKeyword.set.rawValue
-            {
-              mergedValues[0]
+          let shouldUseArray =
+            group.forceArray
+            || !self.options.compactArrays
+            || mergedValues.count != 1
+            || def?.container == .set
+            || def?.container == .list
+          builder.properties[term] =
+            if shouldUseArray {
+              .many(mergedValues)
             } else {
-              .array(mergedValues)
+              .single(mergedValues[0])
             }
         } else {
-          let compacted =
-            if self.options.compactArrays && compactedValues.count == 1 {
-              compactedValues[0]
+          let shouldUseArray =
+            group.forceArray
+            || !self.options.compactArrays
+            || compactedValues.count != 1
+          let compactedValue: SingleOrMany<JSONLDValue<Compacted>> =
+            if shouldUseArray {
+              .many(compactedValues)
             } else {
-              JSONValue.array(compactedValues)
+              .single(compactedValues[0])
             }
           if let existing = compactedReverse[term] {
-            compactedReverse[term] = .array(
-              Self.arrayValue(existing) + Self.arrayValue(compacted)
-            )
+            let merged = Self.arrayValue(existing) + Self.arrayValue(compactedValue)
+            compactedReverse[term] = .many(merged)
           } else {
-            compactedReverse[term] = compacted
+            compactedReverse[term] = compactedValue
           }
         }
       }
     }
     if !compactedReverse.isEmpty {
-      result[self.alias(for: JSONLDKeyword.reverse.rawValue)] = .object(compactedReverse)
+      let reverseMap = ReversePropertyMap<Compacted>(map: compactedReverse)
+      builder.reverse = (term: self.term(for: .reverse), value: reverseMap)
     }
   }
 
   private func compactProperty(
     _ value: JSONValue,
-    into result: inout JSONObject,
+    into builder: inout NodeBuilder,
     expandedProperty: String
   ) throws(JSONLDError) {
     if (self.iriToTerms[expandedProperty] ?? []).isEmpty && !Self.isAbsoluteIRI(expandedProperty) {
@@ -403,7 +451,7 @@ struct CompactionAlgorithm {
         containerHint: nil,
         reverse: false
       )
-      result[term] = .array([])
+      builder.properties[term] = .many([])
       return
     }
 
@@ -418,39 +466,71 @@ struct CompactionAlgorithm {
       let compactedValues = group.compacted
       let originalValues = group.original
 
-      if def?.container == JSONLDKeyword.index.rawValue,
+      if def?.container == .index,
         let indexMap = try self.compactIndexMap(originalValues, activeProperty: term)
       {
-        result[term] = .object(indexMap)
+        builder.properties[term] = .single(.indexMap(indexMap))
         continue
       }
-      if def?.container == JSONLDKeyword.language.rawValue,
+      if def?.container == .language,
         let languageMap = self.compactLanguageMap(originalValues)
       {
-        result[term] = .object(languageMap)
+        builder.properties[term] = .single(.languageMap(languageMap))
         continue
       }
 
-      if compactedValues.isEmpty, def?.container != JSONLDKeyword.set.rawValue,
-        def?.container != JSONLDKeyword.list.rawValue
+      if compactedValues.isEmpty, !group.forceArray, def?.container != .set,
+        def?.container != .list
       {
         continue
       }
 
-      result[term] =
-        if self.options.compactArrays && compactedValues.count == 1
-          && def?.container != JSONLDKeyword.set.rawValue
-        {
-          compactedValues[0]
+      let shouldUseArray =
+        group.forceArray
+        || !self.options.compactArrays
+        || compactedValues.count != 1
+        || def?.container == .set
+        || def?.container == .list
+      builder.properties[term] =
+        if shouldUseArray {
+          .many(compactedValues)
         } else {
-          .array(compactedValues)
+          .single(compactedValues[0])
         }
+    }
+  }
+
+  private struct CompactedItem: Equatable {
+    let values: [JSONLDValue<Compacted>]
+    let isArray: Bool
+
+    static func single(_ value: JSONLDValue<Compacted>) -> Self {
+      .init(values: [value], isArray: false)
+    }
+
+    static func array(_ values: [JSONLDValue<Compacted>]) -> Self {
+      .init(values: values, isArray: true)
+    }
+
+    var isNullSingle: Bool {
+      !self.isArray && self.values.count == 1 && self.values[0] == .null
+    }
+
+    func asSingleOrMany() -> SingleOrMany<JSONLDValue<Compacted>> {
+      if self.isArray {
+        .many(self.values)
+      } else if self.values.count == 1 {
+        .single(self.values[0])
+      } else {
+        .many(self.values)
+      }
     }
   }
 
   private struct ValueGroup {
     var original: [JSONValue] = []
-    var compacted: [JSONValue] = []
+    var compacted: [JSONLDValue<Compacted>] = []
+    var forceArray: Bool = false
   }
 
   private func groupAndCompactValues(
@@ -466,12 +546,15 @@ struct CompactionAlgorithm {
         containerHint: nil,
         reverse: reverse
       )
-      grouped[term, default: .init()].original.append(item)
+      var group = grouped[term, default: .init()]
+      group.original.append(item)
       if let compacted = try self.compactElement(item, activeProperty: term) {
-        if compacted != .null {
-          grouped[term, default: .init()].compacted.append(compacted)
+        if !compacted.isNullSingle {
+          group.compacted.append(contentsOf: compacted.values)
+          group.forceArray = group.forceArray || compacted.isArray
         }
       }
+      grouped[term] = group
     }
     return grouped
   }
@@ -479,84 +562,134 @@ struct CompactionAlgorithm {
   private func compactIndexMap(
     _ values: [JSONValue],
     activeProperty: String?
-  ) throws(JSONLDError) -> JSONObject? {
-    var map: JSONObject = [:]
+  ) throws(JSONLDError) -> JSONLDValue<Compacted>.IndexMap? {
+    var map: [String: SingleOrMany<JSONLDValue<Compacted>.IndexMap.Value>] = [:]
     for value in values {
       guard case .object(let object) = value,
-        let index = Self.stringValue(object[JSONLDKeyword.index.rawValue])
+        let index = Self.stringValue(object[.index])
       else {
         return nil
       }
 
       var compactedValue = object
-      compactedValue.removeValue(forKey: JSONLDKeyword.index.rawValue)
-      let compacted =
-        if let value = try self.compactElement(
+      _ = compactedValue.removeValue(for: .index)
+      guard
+        let compacted = try self.compactElement(
           .object(compactedValue),
           activeProperty: activeProperty
-        ) {
-          value
-        } else {
-          JSONValue.null
-        }
-      if compacted == JSONValue.null {
+        )
+      else {
         continue
       }
+      if compacted.isNullSingle {
+        continue
+      }
+
+      let mappedValues = try compacted.values.map(Self.indexMapValue(from:))
+      let newValue: SingleOrMany<JSONLDValue<Compacted>.IndexMap.Value> =
+        if compacted.isArray {
+          .many(mappedValues)
+        } else if mappedValues.count == 1 {
+          .single(mappedValues[0])
+        } else {
+          .many(mappedValues)
+        }
+
       if let existing = map[index] {
-        map[index] =
-          switch existing {
-          case .array(let array):
-            .array(array + [compacted])
-          default:
-            .array([existing, compacted])
-          }
+        let merged = Self.arrayValue(existing) + mappedValues
+        map[index] = .many(merged)
       } else {
-        map[index] = compacted
+        map[index] = newValue
       }
     }
-    return map
+    return .init(map: map)
   }
 
-  private func compactLanguageMap(_ values: [JSONValue]) -> JSONObject? {
-    var map: JSONObject = [:]
+  private func compactLanguageMap(_ values: [JSONValue]) -> JSONLDValue<Compacted>.LanguageMap? {
+    var map: [String: SingleOrMany<JSONLDValue<Compacted>.LanguageMap.Value>] = [:]
     for value in values {
       guard case .object(let object) = value,
-        let language = Self.stringValue(object[JSONLDKeyword.language.rawValue]),
-        let text = Self.stringValue(object[JSONLDKeyword.value.rawValue]),
-        object[JSONLDKeyword.type.rawValue] == nil,
-        object[JSONLDKeyword.index.rawValue] == nil
+        let language = Self.stringValue(object[.language]),
+        let text = Self.stringValue(object[.value]),
+        object[.type] == nil,
+        object[.index] == nil
       else {
         return nil
       }
 
       let existing = map[language]
-      map[language] =
-        switch existing {
-        case .array(let array):
-          .array(array + [.string(text)])
-        case .string(let string):
-          .array([.string(string), .string(text)])
-        default:
-          .string(text)
-        }
+      let newValue = JSONLDValue<Compacted>.LanguageMap.Value.string(text)
+      if let existing {
+        let merged = Self.arrayValue(existing) + [newValue]
+        map[language] = .many(merged)
+      } else {
+        map[language] = .single(newValue)
+      }
     }
-    return map
+    return .init(map: map)
   }
 
   private func compactValueObject(
     _ object: JSONObject,
     activeProperty: String?
-  ) throws(JSONLDError) -> JSONValue {
-    guard let value = object[JSONLDKeyword.value.rawValue] else { return .object(object) }
-    let type = Self.stringValue(object[JSONLDKeyword.type.rawValue])
-    let language = Self.stringValue(object[JSONLDKeyword.language.rawValue])
-    let index = object[JSONLDKeyword.index.rawValue]
+  ) throws(JSONLDError) -> JSONLDValue<Compacted> {
+    guard let value = object[.value] else {
+      return .node(try self.compactNodeObject(object))
+    }
+    let type = Self.stringValue(object[.type])
+    let language = Self.stringValue(object[.language])
+    let index = object[.index]
+    let valueObjectValue = try JSONLDValue<Compacted>.ValueObject.Value(from: value)
+    let valueTerm = self.term(for: .value)
+    let typeTerm = self.term(for: .type)
+    let languageTerm = self.term(for: .language)
+    let indexTerm = self.term(for: .index)
+
+    func expandedValueObject(
+      type: String?,
+      language: String?,
+      indexValue: JSONValue?
+    ) throws(JSONLDError) -> JSONLDValue<Compacted> {
+      let typeEntry: JSONLDValue<Compacted>.ValueObject.TypeEntry? =
+        if let type {
+          (term: nil, value: try .init(type))
+        } else {
+          nil
+        }
+      let languageEntry: JSONLDValue<Compacted>.ValueObject.LanguageEntry? =
+        language.map { (term: nil, value: $0) }
+      let indexEntry: JSONLDValue<Compacted>.ValueObject.IndexEntry? =
+        try indexValue.map { indexValue throws(JSONLDError) in
+          guard let index = Self.stringValue(indexValue) else {
+            throw .code(.invalidIndexValue)
+          }
+          return (term: nil, value: index)
+        }
+      return .value(
+        .init(
+          value: (term: nil, value: valueObjectValue),
+          type: typeEntry,
+          language: languageEntry,
+          context: nil,
+          index: indexEntry
+        )
+      )
+    }
+
     if type == nil, language == nil {
       if let index {
-        return .object([
-          self.alias(for: JSONLDKeyword.value.rawValue): value,
-          self.alias(for: JSONLDKeyword.index.rawValue): index,
-        ])
+        guard let indexValue = Self.stringValue(index) else {
+          throw .code(.invalidIndexValue)
+        }
+        return .value(
+          .init(
+            value: (term: valueTerm, value: valueObjectValue),
+            type: nil,
+            language: nil,
+            context: nil,
+            index: (term: indexTerm, value: indexValue)
+          )
+        )
       }
       let isStringValue =
         if case .string = value {
@@ -567,45 +700,65 @@ struct CompactionAlgorithm {
       if self.defaultLanguage != nil, let property = activeProperty {
         if let def = self.termDefs[property] {
           if def.type == nil, !def.languageDefined, isStringValue {
-            return .object([self.alias(for: JSONLDKeyword.value.rawValue): value])
+            return .value(.init(value: (term: valueTerm, value: valueObjectValue)))
           }
         } else if isStringValue {
-          return .object([self.alias(for: JSONLDKeyword.value.rawValue): value])
+          return .value(.init(value: (term: valueTerm, value: valueObjectValue)))
         }
       }
-      return value
+      return Self.compactedScalarValue(from: value)
     }
 
     if let property = activeProperty, let def = self.termDefs[property] {
       if let type, def.type == type {
-        if index != nil { return .object(object) }
-        return value
+        return if index != nil {
+          try expandedValueObject(type: type, language: nil, indexValue: index)
+        } else {
+          Self.compactedScalarValue(from: value)
+        }
       }
-      if let language, def.type == nil, def.container != JSONLDKeyword.language.rawValue {
+      if let language, def.type == nil, def.container != .language {
         if def.language == language.lowercased() {
-          if index != nil { return .object(object) }
-          return value
+          return if index != nil {
+            try expandedValueObject(type: nil, language: language, indexValue: index)
+          } else {
+            Self.compactedScalarValue(from: value)
+          }
         }
         if def.language == nil, self.defaultLanguage == language.lowercased() {
-          if index != nil { return .object(object) }
-          return value
+          return if index != nil {
+            try expandedValueObject(type: nil, language: language, indexValue: index)
+          } else {
+            Self.compactedScalarValue(from: value)
+          }
         }
       }
     }
 
-    var result: JSONObject = [self.alias(for: JSONLDKeyword.value.rawValue): value]
-    if let type {
-      result[self.alias(for: JSONLDKeyword.type.rawValue)] = .string(
-        self.compactIRI(type, vocab: true)
+    let typeEntry: JSONLDValue<Compacted>.ValueObject.TypeEntry? =
+      if let type {
+        (term: typeTerm, value: try .init(self.compactIRI(type, vocab: true)))
+      } else {
+        nil
+      }
+    let languageEntry: JSONLDValue<Compacted>.ValueObject.LanguageEntry? =
+      language.map { (term: languageTerm, value: $0) }
+    let indexEntry: JSONLDValue<Compacted>.ValueObject.IndexEntry? =
+      try index.map { indexValue throws(JSONLDError) in
+        guard let index = Self.stringValue(indexValue) else {
+          throw .code(.invalidIndexValue)
+        }
+        return (term: indexTerm, value: index)
+      }
+    return .value(
+      .init(
+        value: (term: valueTerm, value: valueObjectValue),
+        type: typeEntry,
+        language: languageEntry,
+        context: nil,
+        index: indexEntry
       )
-    }
-    if let language {
-      result[self.alias(for: JSONLDKeyword.language.rawValue)] = .string(language)
-    }
-    if let index {
-      result[self.alias(for: JSONLDKeyword.index.rawValue)] = index
-    }
-    return .object(result)
+    )
   }
 
   private func compactIRI(_ iri: String, vocab: Bool) -> String {
@@ -738,14 +891,14 @@ struct CompactionAlgorithm {
     return relative
   }
 
-  private func alias(for keyword: String) -> String {
-    self.keywordAliases[keyword] ?? keyword
+  private func term(for keyword: JSONLDKeyword) -> String? {
+    self.keywordAliases[keyword]
   }
 
   private func selectTerm(
     iri: String,
     value: JSONValue,
-    containerHint: String?,
+    containerHint: Container?,
     reverse: Bool
   ) -> String {
     guard let iriCandidates = self.iriToTerms[iri] else {
@@ -757,21 +910,21 @@ struct CompactionAlgorithm {
     let isListValue = Self.singleListItems(value) != nil
     var candidates = iriCandidates
     if !isListValue {
-      let nonList = iriCandidates.filter { $0.container != JSONLDKeyword.list.rawValue }
+      let nonList = iriCandidates.filter { $0.container != .list }
       if !nonList.isEmpty {
         candidates = nonList
       }
     }
 
     if candidates.count == 1, let candidate = candidates.first,
-      candidate.languageDefined, candidate.container != JSONLDKeyword.language.rawValue,
+      candidate.languageDefined, candidate.container != .language,
       let valueLanguage = Self.singleValueObjectLanguage(value), candidate.language != valueLanguage
     {
       return self.compactWithTerms(iri, includeVocab: true) ?? iri
     }
 
     if Self.containsListObjectWithIndex(value) {
-      let nonListCandidates = candidates.filter { $0.container != JSONLDKeyword.list.rawValue }
+      let nonListCandidates = candidates.filter { $0.container != .list }
       if nonListCandidates.isEmpty {
         return self.compactWithTerms(iri, includeVocab: true) ?? iri
       }
@@ -779,7 +932,7 @@ struct CompactionAlgorithm {
     }
 
     if let listItems = Self.singleListItems(value) {
-      let listCandidates = candidates.filter { $0.container == JSONLDKeyword.list.rawValue }
+      let listCandidates = candidates.filter { $0.container == .list }
       if !listCandidates.isEmpty {
         if let type = Self.homogeneousType(in: listItems) {
           let typedCandidates = listCandidates.filter { $0.type == type }
@@ -787,7 +940,7 @@ struct CompactionAlgorithm {
             return self.bestTerm(
               from: typedCandidates,
               value: value,
-              containerHint: JSONLDKeyword.list.rawValue
+              containerHint: .list
             )
           }
         }
@@ -809,7 +962,7 @@ struct CompactionAlgorithm {
             return self.bestTerm(
               from: languageCandidates,
               value: value,
-              containerHint: JSONLDKeyword.list.rawValue
+              containerHint: .list
             )
           }
         }
@@ -818,15 +971,15 @@ struct CompactionAlgorithm {
           return self.bestTerm(
             from: unconstrained,
             value: value,
-            containerHint: JSONLDKeyword.list.rawValue
+            containerHint: .list
           )
         }
       }
     }
 
     if Self.allItemsContainIndex(value),
-      !candidates.contains(where: { $0.container == JSONLDKeyword.index.rawValue }),
-      candidates.contains(where: { $0.container == JSONLDKeyword.language.rawValue })
+      !candidates.contains(where: { $0.container == .index }),
+      candidates.contains(where: { $0.container == .language })
     {
       return self.compactWithTerms(iri, includeVocab: true) ?? iri
     }
@@ -864,12 +1017,11 @@ struct CompactionAlgorithm {
   private static func containsListObjectWithIndex(_ value: JSONValue) -> Bool {
     switch value {
     case .array(let array):
-      return array.contains(where: Self.containsListObjectWithIndex)
+      array.contains(where: Self.containsListObjectWithIndex)
     case .object(let object):
-      return object[JSONLDKeyword.list.rawValue] != nil
-        && object[JSONLDKeyword.index.rawValue] != nil
+      object[.list] != nil && object[.index] != nil
     default:
-      return false
+      false
     }
   }
 
@@ -884,7 +1036,7 @@ struct CompactionAlgorithm {
     default:
       return nil
     }
-    guard case .array(let items)? = object[JSONLDKeyword.list.rawValue] else { return nil }
+    guard case .array(let items)? = object[.list] else { return nil }
     return items
   }
 
@@ -893,7 +1045,7 @@ struct CompactionAlgorithm {
     var seen: String?
     for item in items {
       guard case .object(let object) = item,
-        let type = Self.stringValue(object[JSONLDKeyword.type.rawValue])
+        let type = Self.stringValue(object[.type])
       else {
         return nil
       }
@@ -912,8 +1064,8 @@ struct CompactionAlgorithm {
       case .string, .integer, .float, .boolean, .null:
         language = .some(nil)
       case .object(let object):
-        guard object[JSONLDKeyword.value.rawValue] != nil else { return nil }
-        language = .some(Self.stringValue(object[JSONLDKeyword.language.rawValue])?.lowercased())
+        guard object[.value] != nil else { return nil }
+        language = .some(Self.stringValue(object[.language])?.lowercased())
       default:
         return nil
       }
@@ -927,14 +1079,14 @@ struct CompactionAlgorithm {
     switch value {
     case .array(let array):
       guard array.count == 1, case .object(let object) = array[0],
-        object[JSONLDKeyword.value.rawValue] != nil
+        object[.value] != nil
       else {
         return nil
       }
-      return Self.stringValue(object[JSONLDKeyword.language.rawValue])?.lowercased()
+      return Self.stringValue(object[.language])?.lowercased()
     case .object(let object):
-      guard object[JSONLDKeyword.value.rawValue] != nil else { return nil }
-      return Self.stringValue(object[JSONLDKeyword.language.rawValue])?.lowercased()
+      guard object[.value] != nil else { return nil }
+      return Self.stringValue(object[.language])?.lowercased()
     default:
       return nil
     }
@@ -946,12 +1098,12 @@ struct CompactionAlgorithm {
       if array.isEmpty { return false }
       return array.allSatisfy {
         if case .object(let object) = $0 {
-          return object[JSONLDKeyword.index.rawValue] != nil
+          return object[.index] != nil
         }
         return false
       }
     case .object(let object):
-      return object[JSONLDKeyword.index.rawValue] != nil
+      return object[.index] != nil
     default:
       return false
     }
@@ -960,7 +1112,7 @@ struct CompactionAlgorithm {
   private func bestTerm(
     from candidates: [TermDef],
     value: JSONValue,
-    containerHint: String?
+    containerHint: Container?
   ) -> String {
     let sorted = candidates.sorted { a, b in
       let scoreA = self.scoreTerm(a, value: value, containerHint: containerHint)
@@ -970,7 +1122,7 @@ struct CompactionAlgorithm {
       return a.term.count < b.term.count
     }
     if case .array(let values) = value, values.count == 1, case .object(let obj) = values[0],
-      let id = Self.stringValue(obj[JSONLDKeyword.id.rawValue])
+      let id = Self.stringValue(obj[.id])
     {
       if let vocabMatch = sorted.first(where: {
         $0.type == JSONLDKeyword.vocab.rawValue && self.iriToTerms[id] != nil
@@ -981,18 +1133,20 @@ struct CompactionAlgorithm {
         return idMatch.term
       }
     }
-    if let containerHint,
+    return
+      if let containerHint,
       let containerMatch = sorted.first(where: { $0.container == containerHint })
     {
-      return containerMatch.term
+      containerMatch.term
+    } else {
+      sorted.first?.term ?? candidates[0].term
     }
-    return sorted.first?.term ?? candidates[0].term
   }
 
   private func scoreTerm(
     _ candidate: TermDef,
     value: JSONValue,
-    containerHint: String?
+    containerHint: Container?
   ) -> (Int, Int, Int, String) {
     let containerPriority: Int =
       if let containerHint, candidate.container == containerHint {
@@ -1007,29 +1161,29 @@ struct CompactionAlgorithm {
       switch value {
       case .array(let array):
         if array.count > 1
-          && array.allSatisfy({ Self.hasKeyword($0, keyword: JSONLDKeyword.index.rawValue) })
+          && array.allSatisfy({ $0[.index] != nil })
         {
-          candidate.container == JSONLDKeyword.index.rawValue ? 0 : 2
+          candidate.container == .index ? 0 : 2
         } else if array.count > 1
-          && array.allSatisfy({ Self.hasKeyword($0, keyword: JSONLDKeyword.language.rawValue) })
+          && array.allSatisfy({ $0[.language] != nil })
         {
-          candidate.container == JSONLDKeyword.language.rawValue ? 0 : 2
+          candidate.container == .language ? 0 : 2
         } else if array.count == 1, case .object(let obj) = array[0],
-          let type = Self.stringValue(obj[JSONLDKeyword.type.rawValue])
+          let type = Self.stringValue(obj[.type])
         {
           candidate.type == type ? 0 : 2
         } else if array.count == 1, case .object(let obj) = array[0],
-          obj[JSONLDKeyword.id.rawValue] != nil
+          obj[.id] != nil
         {
           candidate.type == JSONLDKeyword.id.rawValue
             || candidate.type == JSONLDKeyword.vocab.rawValue ? 0 : 2
         } else if array.count == 1, case .object(let obj) = array[0],
-          obj[JSONLDKeyword.value.rawValue] != nil
+          obj[.value] != nil
         {
-          if let language = Self.stringValue(obj[JSONLDKeyword.language.rawValue]) {
-            if candidate.container == JSONLDKeyword.language.rawValue {
+          if let language = Self.stringValue(obj[.language]) {
+            if candidate.container == .language {
               0
-            } else if candidate.type == nil, candidate.container != JSONLDKeyword.index.rawValue {
+            } else if candidate.type == nil, candidate.container != .index {
               if candidate.languageDefined {
                 if let candidateLanguage = candidate.language {
                   candidateLanguage == language.lowercased() ? 0 : 2
@@ -1058,14 +1212,14 @@ struct CompactionAlgorithm {
           1
         }
       case .object(let object):
-        if object[JSONLDKeyword.index.rawValue] != nil {
-          candidate.container == JSONLDKeyword.index.rawValue ? 0 : 2
-        } else if let type = Self.stringValue(object[JSONLDKeyword.type.rawValue]) {
+        if object[.index] != nil {
+          candidate.container == .index ? 0 : 2
+        } else if let type = Self.stringValue(object[.type]) {
           candidate.type == type ? 0 : 2
-        } else if let language = Self.stringValue(object[JSONLDKeyword.language.rawValue]) {
-          if candidate.container == JSONLDKeyword.language.rawValue {
+        } else if let language = Self.stringValue(object[.language]) {
+          if candidate.container == .language {
             0
-          } else if candidate.type == nil, candidate.container != JSONLDKeyword.index.rawValue {
+          } else if candidate.type == nil, candidate.container != .index {
             if candidate.languageDefined {
               if let candidateLanguage = candidate.language {
                 candidateLanguage == language.lowercased() ? 0 : 2
@@ -1080,7 +1234,7 @@ struct CompactionAlgorithm {
           } else {
             2
           }
-        } else if object[JSONLDKeyword.value.rawValue] != nil {
+        } else if object[.value] != nil {
           if candidate.type != nil {
             2
           } else if candidate.languageDefined {
@@ -1120,7 +1274,7 @@ struct CompactionAlgorithm {
       if let mapped = Self.stringValue(context[value]) {
         return expandIRI(mapped, context: context, seen: seen.union([value]))
       }
-      if let vocab = Self.stringValue(context[JSONLDKeyword.vocab.rawValue]) {
+      if let vocab = Self.stringValue(context[.vocab]) {
         return vocab + value
       }
       return value
@@ -1141,33 +1295,40 @@ struct CompactionAlgorithm {
           isSimpleTerm: true
         )
       case .object(let object):
-        let languageValue = Self.stringValue(object[JSONLDKeyword.language.rawValue])?.lowercased()
-        let languageDefined = object[JSONLDKeyword.language.rawValue] != nil
-        let typeValue = Self.stringValue(object[JSONLDKeyword.type.rawValue]).map { type in
+        let languageValue = Self.stringValue(object[.language])?.lowercased()
+        let languageDefined = object[.language] != nil
+        let typeValue = Self.stringValue(object[.type]).map { type in
           if type == JSONLDKeyword.id.rawValue || type == JSONLDKeyword.vocab.rawValue {
             return type
           }
           return expandIRI(type, context: context)
         }
-        if let reverse = Self.stringValue(object[JSONLDKeyword.reverse.rawValue]) {
+        let container: Container?
+        if let containerValue = object[.container] {
+          let mapping = try Container(from: containerValue)
+          container = mapping == .null ? nil : mapping
+        } else {
+          container = nil
+        }
+        if let reverse = Self.stringValue(object[.reverse]) {
           defs[term] = .init(
             term: term,
             iri: expandIRI(reverse, context: context),
             type: typeValue,
             language: languageValue,
             languageDefined: languageDefined,
-            container: Self.stringValue(object[JSONLDKeyword.container.rawValue]),
+            container: container,
             reverse: true,
             isSimpleTerm: false
           )
-        } else if let id = Self.stringValue(object[JSONLDKeyword.id.rawValue]) {
+        } else if let id = Self.stringValue(object[.id]) {
           defs[term] = .init(
             term: term,
             iri: expandIRI(id, context: context),
             type: typeValue,
             language: languageValue,
             languageDefined: languageDefined,
-            container: Self.stringValue(object[JSONLDKeyword.container.rawValue]),
+            container: container,
             reverse: false,
             isSimpleTerm: false
           )
@@ -1178,7 +1339,7 @@ struct CompactionAlgorithm {
             type: typeValue,
             language: languageValue,
             languageDefined: languageDefined,
-            container: Self.stringValue(object[JSONLDKeyword.container.rawValue]),
+            container: container,
             reverse: false,
             isSimpleTerm: false
           )
@@ -1194,7 +1355,7 @@ struct CompactionAlgorithm {
   }
 
   private static func resolveVocabMapping(_ context: JSONObject, baseIRI: String?) -> String? {
-    guard let vocab = Self.stringValue(context[JSONLDKeyword.vocab.rawValue]) else { return nil }
+    guard let vocab = Self.stringValue(context[.vocab]) else { return nil }
     if vocab.isEmpty || vocab.contains(":") { return vocab }
     guard let baseIRI, let baseURL = URL(string: baseIRI),
       let resolved = URL(string: vocab, relativeTo: baseURL)
@@ -1258,23 +1419,103 @@ struct CompactionAlgorithm {
 
   private static func arrayValue(_ value: JSONValue?) -> [JSONValue] {
     switch value {
-    case .array(let array):
-      return array
-    case .some(let scalar):
-      return [scalar]
+    case .array(let array)?:
+      array
+    case let scalar?:
+      [scalar]
     case .none:
-      return []
+      []
     }
   }
 
-  private static func hasKeyword(_ value: JSONValue, keyword: String) -> Bool {
-    guard case .object(let object) = value else { return false }
-    return object[keyword] != nil
+  private static func arrayValue<T>(_ value: SingleOrMany<T>?) -> [T] {
+    switch value {
+    case .single(let single)?:
+      [single]
+    case .many(let values)?:
+      values
+    case .none:
+      []
+    }
   }
 
   private static func isListObject(_ value: JSONValue) -> Bool {
     guard case .object(let object) = value else { return false }
-    return object[JSONLDKeyword.list.rawValue] != nil
+    return object[.list] != nil
+  }
+
+  private static func isListObject(_ value: JSONLDValue<Compacted>) -> Bool {
+    if case .setOrList(let object) = value {
+      if case .list = object.value {
+        return true
+      }
+    }
+    return false
+  }
+
+  private static func compactedScalarValue(from value: JSONValue) -> JSONLDValue<Compacted> {
+    switch value {
+    case .string(let string):
+      .iriOrTerm(string)
+    case .integer(let integer):
+      .integer(integer)
+    case .float(let float):
+      .float(float)
+    case .boolean(let boolean):
+      .boolean(boolean)
+    case .null:
+      .null
+    default:
+      .invalid(.notJSONLDValue)
+    }
+  }
+
+  private static func setOrListElement(
+    from value: JSONLDValue<Compacted>
+  ) throws(JSONLDError) -> JSONLDValue<Compacted>.SetOrListObject.Element {
+    switch value {
+    case .iriOrTerm(let string):
+      .string(string)
+    case .integer(let integer):
+      .integer(integer)
+    case .float(let float):
+      .float(float)
+    case .boolean(let boolean):
+      .boolean(boolean)
+    case .null:
+      .null
+    case .node(let node):
+      .nodeObject(node)
+    case .value(let value):
+      .valueObject(value)
+    case .setOrList, .languageMap, .indexMap, .unknown, .invalid:
+      throw .code(.listOfLists)
+    }
+  }
+
+  private static func indexMapValue(
+    from value: JSONLDValue<Compacted>
+  ) throws(JSONLDError) -> JSONLDValue<Compacted>.IndexMap.Value {
+    switch value {
+    case .iriOrTerm(let string):
+      .string(string)
+    case .integer(let integer):
+      .integer(integer)
+    case .float(let float):
+      .float(float)
+    case .boolean(let boolean):
+      .boolean(boolean)
+    case .null:
+      .null
+    case .node(let node):
+      .nodeObject(node)
+    case .value(let value):
+      .valueObject(value)
+    case .setOrList(let object):
+      .setOrListObject(object)
+    case .languageMap, .indexMap, .unknown, .invalid:
+      throw .code(.invalidIndexValue)
+    }
   }
 
   private static func isAbsoluteIRI(_ value: String) -> Bool {
@@ -1286,9 +1527,39 @@ struct CompactionAlgorithm {
     return false
   }
 
-  private func isTopLevelFreeFloatingNode(_ object: JSONObject) -> Bool {
-    if object.count != 1 { return false }
-    return object[self.alias(for: JSONLDKeyword.id.rawValue)] != nil
+  private func addTopLevelContext(
+    _ node: JSONLDValue<Compacted>.NodeObject
+  ) throws(JSONLDError) -> JSONLDValue<Compacted>.NodeObject {
+    guard !node.jsonObject.isEmpty else {
+      return node
+    }
+    guard Self.isMeaningfulContext(self.contextValue) else {
+      return node
+    }
+    let context = try Contexts(from: self.contextValue)
+    let contextEntry: JSONLDValue<Compacted>.NodeObject.ContextEntry = (
+      term: self.term(for: .context),
+      value: context
+    )
+    return .init(
+      context: contextEntry,
+      id: node.idEntry,
+      graph: node.graphEntry,
+      type: node.typeEntry,
+      reverse: node.reverseEntry,
+      index: node.indexEntry,
+      properties: node.properties
+    )
+  }
+
+  private func isTopLevelFreeFloatingNode(_ node: JSONLDValue<Compacted>.NodeObject) -> Bool {
+    node.properties.isEmpty
+      && node.context == nil
+      && node.graph == nil
+      && node.type == nil
+      && node.reverse == nil
+      && node.index == nil
+      && node.id != nil
   }
 
   private static func baseDirectoryPath(_ path: String) -> String {
@@ -1303,12 +1574,15 @@ struct CompactionAlgorithm {
 
   private static func valueTypeHint(_ value: JSONValue) -> String? {
     if case .object(let object) = value {
-      return Self.stringValue(object[JSONLDKeyword.type.rawValue])
+      Self.stringValue(object[.type])
+    } else if case .array(let array) = value,
+      array.count == 1,
+      case .object(let object) = array[0]
+    {
+      Self.stringValue(object[.type])
+    } else {
+      nil
     }
-    if case .array(let array) = value, array.count == 1, case .object(let object) = array[0] {
-      return Self.stringValue(object[JSONLDKeyword.type.rawValue])
-    }
-    return nil
   }
 
   private static func containsNonIRIString(_ value: JSONValue) -> Bool {
@@ -1320,25 +1594,25 @@ struct CompactionAlgorithm {
       return false
     }
 
-    switch value {
+    return switch value {
     case .string(let string):
-      return !isIRIish(string)
+      !isIRIish(string)
     case .array(let array):
-      return array.contains { item in
+      array.contains { item in
         if case .string(let string) = item {
           return !isIRIish(string)
         }
         if case .object(let object) = item,
-          let string = Self.stringValue(object[JSONLDKeyword.value.rawValue]),
-          object[JSONLDKeyword.type.rawValue] == nil,
-          object[JSONLDKeyword.language.rawValue] == nil
+          let string = Self.stringValue(object[.value]),
+          object[.type] == nil,
+          object[.language] == nil
         {
           return !isIRIish(string)
         }
         return false
       }
     default:
-      return false
+      false
     }
   }
 
@@ -1364,13 +1638,13 @@ struct CompactionAlgorithm {
   private static func isMeaningfulContext(_ value: JSONValue) -> Bool {
     switch value {
     case .object(let object):
-      return !object.isEmpty
+      !object.isEmpty
     case .array(let array):
-      return !array.isEmpty
+      !array.isEmpty
     case .null:
-      return false
+      false
     default:
-      return true
+      true
     }
   }
 }
