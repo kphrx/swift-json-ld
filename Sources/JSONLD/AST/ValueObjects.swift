@@ -3,7 +3,7 @@
 
 extension JSONLDValue {
   /// A *value object* in JSON-LD.
-  public struct ValueObject: CustomJSONObjectConvertible, Equatable {
+  public struct ValueObject: CustomJSONObjectConvertible {
     typealias ValueEntry = (term: String?, value: Value)
     typealias ContextEntry = (term: String?, value: Contexts)
     typealias TypeEntry = (term: String?, value: ValueType)
@@ -35,7 +35,8 @@ extension JSONLDValue.ValueObject {
   }
 }
 
-extension JSONLDValue.ValueObject {
+extension JSONLDValue.ValueObject: Equatable {
+  /// Returns a Boolean value indicating whether two values are equal.
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.valueEntry.term == rhs.valueEntry.term
       && lhs.valueEntry.value == rhs.valueEntry.value
@@ -134,39 +135,37 @@ extension JSONLDValue.ValueObject {
       jsonObject.set(languageEntry.value, for: .language, term: languageEntry.term)
     }
 
+    if let contextEntry = self.contextEntry {
+      jsonObject.set(contextEntry.value, for: .context, term: contextEntry.term)
+    }
+
     if let indexEntry = self.indexEntry {
       jsonObject.set(indexEntry.value, for: .index, term: indexEntry.term)
     }
 
     return jsonObject
   }
+}
 
+extension JSONLDValue.ValueObject where P == Expanded {
   init(value: Value, language: String? = nil, context: Contexts? = nil, index: String? = nil) {
     self.valueEntry = (term: nil, value: value)
     self.contextEntry = context.map { (term: nil, value: $0) }
     self.indexEntry = index.map { (term: nil, value: $0) }
-    self.languageEntry = language.map { (term: nil, value: $0) }
     self.typeEntry = nil
+    self.languageEntry = language.map { (term: nil, value: $0) }
   }
 
-  init(
-    value: Value,
-    type: String?,
-    context: Contexts? = nil,
-    index: String? = nil
-  ) throws(JSONLDError) {
+  init(value: Value, type: ValueType?, context: Contexts? = nil, index: String? = nil) {
     self.valueEntry = (term: nil, value: value)
     self.contextEntry = context.map { (term: nil, value: $0) }
     self.indexEntry = index.map { (term: nil, value: $0) }
-    self.typeEntry =
-      if let type {
-        (term: nil, value: try .init(type))
-      } else {
-        (term: nil, value: .null)
-      }
+    self.typeEntry = type.map { (term: nil, value: $0) }
     self.languageEntry = nil
   }
+}
 
+extension JSONLDValue.ValueObject where P == Compacted {
   init(
     value: ValueEntry,
     type: TypeEntry? = nil,
@@ -179,6 +178,32 @@ extension JSONLDValue.ValueObject {
     self.languageEntry = language
     self.contextEntry = context
     self.indexEntry = index
+  }
+}
+
+extension JSONLDValue.ValueObject where P == Flattened {
+  init(
+    value: ValueEntry,
+    type: TypeEntry? = nil,
+    language: LanguageEntry? = nil,
+    context: ContextEntry? = nil,
+    index: IndexEntry? = nil
+  ) {
+    self.valueEntry = value
+    self.typeEntry = type
+    self.languageEntry = language
+    self.contextEntry = context
+    self.indexEntry = index
+  }
+}
+
+extension JSONLDValue.ValueObject where P == Unresolved {
+  init(value: Value) {
+    self.valueEntry = (term: nil, value: value)
+    self.contextEntry = nil
+    self.typeEntry = nil
+    self.languageEntry = nil
+    self.indexEntry = nil
   }
 
   /// Creates a value object from a JSON object.
@@ -224,5 +249,33 @@ extension JSONLDValue.ValueObject {
       default: throw .code(.invalidLanguageTaggedValue)
       }
     }
+  }
+}
+
+extension JSONLDValue.ValueObject {
+  init(alreadyProcessed jsonObject: JSONObject) throws(JSONLDError) {
+    var properties = jsonObject
+    guard let value = properties.removeValue(for: .value) else {
+      throw .internalError(.notValueObject)
+    }
+    self.valueEntry = (term: nil, value: try .init(from: value))
+
+    self.contextEntry = try properties.extractContext().map { (term: nil, value: $0) }
+
+    self.languageEntry =
+      switch properties.removeValue(for: .language) {
+      case .string(let language)?: (term: nil, value: language)
+      case nil: nil
+      case _?: throw .code(.invalidLanguageTaggedString)
+      }
+
+    self.typeEntry =
+      switch properties.removeValue(for: .type) {
+      case .string(let type)?: (term: nil, value: try .init(type))
+      case nil: nil
+      case _?: throw .code(.invalidTypedValue)
+      }
+
+    self.indexEntry = try properties.extractIndex().map { (term: nil, value: $0) }
   }
 }

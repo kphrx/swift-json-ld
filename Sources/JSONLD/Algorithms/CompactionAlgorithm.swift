@@ -138,7 +138,7 @@ struct CompactionAlgorithm {
     case .node(let node):
       .init(.single(try self.addTopLevelContext(node)))
     default:
-      try .init(validating: item.jsonValue)
+      .init(.many([]))
     }
   }
 
@@ -168,7 +168,7 @@ struct CompactionAlgorithm {
       }
       if let list = object[.list] {
         guard case .array(let items) = list else {
-          return .single(.setOrList(try .init(from: object)))
+          throw .code(.invalidSetOrListObject)
         }
         if items.contains(where: Self.isListObject) {
           throw .code(.compactionToListOfLists)
@@ -204,17 +204,15 @@ struct CompactionAlgorithm {
         return .single(
           .setOrList(
             .init(
-              term: self.term(for: .list),
-              value: .list(.many(elements)),
-              index: indexValue,
-              indexTerm: indexTerm
+              value: (term: self.term(for: .list), value: .list(.many(elements))),
+              index: indexValue.map { (term: indexTerm, value: $0) }
             )
           )
         )
       }
       if let set = object[.set] {
         guard case .array(let items) = set else {
-          return .single(.setOrList(try .init(from: object)))
+          throw .code(.invalidSetOrListObject)
         }
         var compactedItems: [JSONLDValue<Compacted>] = []
         compactedItems.reserveCapacity(items.count)
@@ -365,7 +363,8 @@ struct CompactionAlgorithm {
     guard case .object(let reverseObject) = value else {
       throw .code(.invalidReversePropertyMap)
     }
-    var compactedReverse: [String: SingleOrMany<JSONLDValue<Compacted>>] = [:]
+    var compactedReverse:
+      [String: SingleOrMany<JSONLDValue<Compacted>.NodeObject.ReversePropertyMap.Value>] = [:]
     for (reverseProperty, reverseValue) in reverseObject {
       guard case .array(let values) = reverseValue else { continue }
 
@@ -408,12 +407,14 @@ struct CompactionAlgorithm {
             group.forceArray
             || !self.options.compactArrays
             || compactedValues.count != 1
-          let compactedValue: SingleOrMany<JSONLDValue<Compacted>> =
-            if shouldUseArray {
-              .many(compactedValues)
-            } else {
-              .single(compactedValues[0])
-            }
+          let compactedElements = try compactedValues.map(Self.reverseMapValue(from:))
+          let compactedValue:
+            SingleOrMany<JSONLDValue<Compacted>.NodeObject.ReversePropertyMap.Value> =
+              if shouldUseArray {
+                .many(compactedElements)
+              } else {
+                .single(compactedElements[0])
+              }
           if let existing = compactedReverse[term] {
             let merged = Self.arrayValue(existing) + Self.arrayValue(compactedValue)
             compactedReverse[term] = .many(merged)
@@ -424,7 +425,7 @@ struct CompactionAlgorithm {
       }
     }
     if !compactedReverse.isEmpty {
-      let reverseMap = ReversePropertyMap<Compacted>(map: compactedReverse)
+      let reverseMap = JSONLDValue<Compacted>.NodeObject.ReversePropertyMap(map: compactedReverse)
       builder.reverse = (term: self.term(for: .reverse), value: reverseMap)
     }
   }
@@ -857,8 +858,8 @@ struct CompactionAlgorithm {
       }
     }
 
-    let baseDirectory = Self.baseDirectoryPath(base.path)
-    let baseSegments = Self.pathSegments(baseDirectory)
+    let baseDirectoryPath = Self.baseDirectoryPath(base.path)
+    let baseSegments = Self.pathSegments(baseDirectoryPath)
     let iriSegments = Self.pathSegments(iri.path)
 
     var common = 0
@@ -1393,7 +1394,7 @@ struct CompactionAlgorithm {
       if let reverse = node.reverse {
         for values in reverse.map.values {
           for child in values {
-            try Self.validateInvalidCompactionInput(child)
+            try Self.validateInvalidCompactionInput(JSONLDValue<Unresolved>(child))
           }
         }
       }
@@ -1404,12 +1405,12 @@ struct CompactionAlgorithm {
       }
     case .setOrList(let setOrList):
       for child in setOrList.value {
-        try Self.validateInvalidCompactionInput(.init(child))
+        try Self.validateInvalidCompactionInput(JSONLDValue<Unresolved>(child))
       }
     case .indexMap(let indexMap):
       for values in indexMap.map.values {
         for child in values {
-          try Self.validateInvalidCompactionInput(.init(child))
+          try Self.validateInvalidCompactionInput(JSONLDValue<Unresolved>(child))
         }
       }
     default:
@@ -1515,6 +1516,19 @@ struct CompactionAlgorithm {
       .setOrListObject(object)
     case .languageMap, .indexMap, .unknown, .invalid:
       throw .code(.invalidIndexValue)
+    }
+  }
+
+  private static func reverseMapValue(
+    from value: JSONLDValue<Compacted>
+  ) throws(JSONLDError) -> JSONLDValue<Compacted>.NodeObject.ReversePropertyMap.Value {
+    switch value {
+    case .node(let node):
+      .node(node)
+    case .iriOrTerm(let string):
+      .iri(string)
+    default:
+      throw .code(.invalidReversePropertyValue)
     }
   }
 

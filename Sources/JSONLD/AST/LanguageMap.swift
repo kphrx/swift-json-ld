@@ -16,7 +16,23 @@ extension JSONLDValue.LanguageMap {
   }
 }
 
+extension JSONLDValue.LanguageMap {
+  init(alreadyProcessed jsonObject: JSONObject) throws(JSONLDError) {
+    self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
+      try .init(from: jsonValue, mapper: Value.init(alreadyProcessed:))
+    }
+  }
+}
+
 extension JSONLDValue.LanguageMap.Value {
+  init(alreadyProcessed jsonValue: JSONValue) throws(JSONLDError) {
+    switch jsonValue {
+    case .string(let value): self = .string(value)
+    case .null: self = .null
+    default: throw .code(.invalidLanguageMapValue)
+    }
+  }
+
   /// Returns this language map value as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
@@ -24,7 +40,9 @@ extension JSONLDValue.LanguageMap.Value {
     case .null: .null
     }
   }
+}
 
+extension JSONLDValue.LanguageMap.Value where P == Unresolved {
   /// Creates a language map value from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {
@@ -40,7 +58,9 @@ extension JSONLDValue.LanguageMap {
   public var jsonObject: JSONObject {
     self.map.jsonObject
   }
+}
 
+extension JSONLDValue.LanguageMap where P == Unresolved {
   /// Creates a language map from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in

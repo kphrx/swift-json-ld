@@ -22,9 +22,33 @@ extension JSONLDValue.IndexMap {
   }
 }
 
+extension JSONLDValue.IndexMap {
+  init(alreadyProcessed jsonObject: JSONObject) throws(JSONLDError) {
+    self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
+      try .init(from: jsonValue, mapper: Value.init(alreadyProcessed:))
+    }
+  }
+}
+
 extension JSONLDValue.IndexMap.Value {
-  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [Self] {
-    try jsonArray.map(Self.init(from:))
+  init(alreadyProcessed jsonValue: JSONValue) throws(JSONLDError) {
+    self =
+      switch jsonValue {
+      case .string(let value): .string(value)
+      case .integer(let value): .integer(value)
+      case .float(let value): .float(value)
+      case .boolean(let value): .boolean(value)
+      case .null: .null
+      case .object(let jsonObject):
+        if jsonObject.contains(.value) {
+          try .valueObject(.init(alreadyProcessed: jsonObject))
+        } else if jsonObject.contains(.list) || jsonObject.contains(.set) {
+          try .setOrListObject(.init(alreadyProcessed: jsonObject))
+        } else {
+          try .nodeObject(.init(alreadyProcessed: jsonObject))
+        }
+      default: throw .code(.invalidIndexValue)
+      }
   }
 
   /// Returns this index map value as a JSON value.
@@ -39,6 +63,12 @@ extension JSONLDValue.IndexMap.Value {
     case .valueObject(let valueObject): valueObject.jsonValue
     case .setOrListObject(let object): object.jsonValue
     }
+  }
+}
+
+extension JSONLDValue.IndexMap.Value where P == Unresolved {
+  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [Self] {
+    try jsonArray.map(Self.init(from:))
   }
 
   /// Creates an index map value from a JSON value.
@@ -68,7 +98,9 @@ extension JSONLDValue.IndexMap {
   public var jsonObject: JSONObject {
     self.map.jsonObject
   }
+}
 
+extension JSONLDValue.IndexMap where P == Unresolved {
   /// Creates an index map from a JSON object.
   public init(from jsonObject: JSONObject) throws(JSONLDError) {
     self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in

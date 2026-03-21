@@ -45,6 +45,37 @@ public enum JSONLDValue<P: JSONLDPhase>: CustomJSONValueConvertible, Equatable {
     }
   }
 
+  init(alreadyProcessed jsonValue: JSONValue) throws(JSONLDError) {
+    switch jsonValue {
+    case .string(let string):
+      self = .iriOrTerm(string)
+    case .integer(let integer):
+      self = .integer(integer)
+    case .float(let float):
+      self = .float(float)
+    case .boolean(let boolean):
+      self = .boolean(boolean)
+    case .null:
+      self = .null
+    case .array:
+      self = .invalid(.notJSONLDValue)
+    case .object(let jsonObject):
+      if jsonObject.contains(.value) {
+        self = .value(try .init(alreadyProcessed: jsonObject))
+      } else if jsonObject.contains(.list) || jsonObject.contains(.set) {
+        do {
+          self = .setOrList(try .init(alreadyProcessed: jsonObject))
+        } catch let error where error.kind == .code(.listOfLists) {
+          self = .invalid(.listOfLists)
+        }
+      } else {
+        self = .node(try .init(alreadyProcessed: jsonObject))
+      }
+    }
+  }
+}
+
+extension JSONLDValue where P == Unresolved {
   /// Creates a JSON-LD value from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     switch jsonValue {

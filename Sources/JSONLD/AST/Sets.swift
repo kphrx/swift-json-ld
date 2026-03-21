@@ -3,27 +3,14 @@
 
 extension JSONLDValue {
   /// A *set object* or *list object* in JSON-LD.
-  public struct SetOrListObject: CustomJSONObjectConvertible, Equatable {
-    private typealias ValueEntry = (term: String?, value: Value)
-    private typealias ContextEntry = (term: String?, value: Contexts)
-    private typealias IndexEntry = (term: String?, value: String)
+  public struct SetOrListObject: CustomJSONObjectConvertible {
+    typealias ValueEntry = (term: String?, value: Value)
+    typealias ContextEntry = (term: String?, value: Contexts)
+    typealias IndexEntry = (term: String?, value: String)
 
     private let valueEntry: ValueEntry
     private let contextEntry: ContextEntry?
     private let indexEntry: IndexEntry?
-
-    init(
-      term: String? = nil,
-      value: Value,
-      context: Contexts? = nil,
-      contextTerm: String? = nil,
-      index: String? = nil,
-      indexTerm: String? = nil
-    ) {
-      self.valueEntry = (term: term, value: value)
-      self.contextEntry = context.map { (term: contextTerm, value: $0) }
-      self.indexEntry = index.map { (term: indexTerm, value: $0) }
-    }
   }
 }
 
@@ -42,6 +29,25 @@ extension JSONLDValue.SetOrListObject {
     case null
     case nodeObject(JSONLDValue.NodeObject)
     case valueObject(JSONLDValue.ValueObject)
+
+    init(alreadyProcessed jsonValue: JSONValue) throws(JSONLDError) {
+      self =
+        switch jsonValue {
+        case .string(let value): .string(value)
+        case .integer(let value): .integer(value)
+        case .float(let value): .float(value)
+        case .boolean(let value): .boolean(value)
+        case .null: .null
+        case .object(let jsonObject):
+          if jsonObject.contains(.value) {
+            try .valueObject(.init(alreadyProcessed: jsonObject))
+          } else {
+            try .nodeObject(.init(alreadyProcessed: jsonObject))
+          }
+        default:
+          throw .code(.listOfLists)
+        }
+    }
   }
 }
 
@@ -54,10 +60,6 @@ extension JSONLDValue.SetOrListObject.Value: Sequence {
 }
 
 extension JSONLDValue.SetOrListObject.Element {
-  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [Self] {
-    try jsonArray.map(Self.init(from:))
-  }
-
   /// Returns this element as a JSON value.
   public var jsonValue: JSONValue {
     switch self {
@@ -69,6 +71,12 @@ extension JSONLDValue.SetOrListObject.Element {
     case .nodeObject(let nodeObject): nodeObject.jsonValue
     case .valueObject(let valueObject): valueObject.jsonValue
     }
+  }
+}
+
+extension JSONLDValue.SetOrListObject.Element where P == Unresolved {
+  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [Self] {
+    try jsonArray.map(Self.init(from:))
   }
 
   /// Creates an element from a JSON value.
@@ -101,43 +109,63 @@ extension JSONLDValue.SetOrListObject {
     self.valueEntry.value
   }
 
-  var valueTerm: String? {
-    self.valueEntry.term
-  }
-
   var context: Contexts? {
     self.contextEntry?.value
-  }
-
-  var contextTerm: String? {
-    self.contextEntry?.term
   }
 
   var index: String? {
     self.indexEntry?.value
   }
 
-  var indexTerm: String? {
-    self.indexEntry?.term
-  }
-
   /// Returns this set or list as a JSON object.
   public var jsonObject: JSONObject {
     var jsonObject: JSONObject = [:]
-    switch self.value {
-    case .set(let values): jsonObject.set(values, for: .set, term: self.valueTerm)
-    case .list(let values): jsonObject.set(values, for: .list, term: self.valueTerm)
+    switch self.valueEntry.value {
+    case .set(let values): jsonObject.set(values, for: .set, term: self.valueEntry.term)
+    case .list(let values): jsonObject.set(values, for: .list, term: self.valueEntry.term)
     }
 
-    if let context = self.context {
-      jsonObject.set(context, for: .context, term: self.contextTerm)
+    if let contextEntry = self.contextEntry {
+      jsonObject.set(contextEntry.value, for: .context, term: contextEntry.term)
     }
 
-    if let index = self.index {
-      jsonObject.set(index, for: .index, term: self.indexTerm)
+    if let indexEntry = self.indexEntry {
+      jsonObject.set(indexEntry.value, for: .index, term: indexEntry.term)
     }
 
     return jsonObject
+  }
+}
+
+extension JSONLDValue.SetOrListObject where P == Expanded {
+  init(value: Value, context: Contexts? = nil, index: String? = nil) {
+    self.valueEntry = (term: nil, value: value)
+    self.contextEntry = context.map { (term: nil, value: $0) }
+    self.indexEntry = index.map { (term: nil, value: $0) }
+  }
+}
+
+extension JSONLDValue.SetOrListObject where P == Compacted {
+  init(
+    value: ValueEntry,
+    context: ContextEntry? = nil,
+    index: IndexEntry? = nil
+  ) {
+    self.valueEntry = value
+    self.contextEntry = context
+    self.indexEntry = index
+  }
+}
+
+extension JSONLDValue.SetOrListObject where P == Unresolved {
+  init(
+    value: Value,
+    context: Contexts? = nil,
+    index: String? = nil
+  ) {
+    self.valueEntry = (term: nil, value: value)
+    self.contextEntry = context.map { (term: nil, value: $0) }
+    self.indexEntry = index.map { (term: nil, value: $0) }
   }
 
   /// Creates a set or list object from a JSON object.
@@ -155,20 +183,21 @@ extension JSONLDValue.SetOrListObject {
         .init(
           value: .set(try .init(from: setValue, mapper: Element.init(from:))),
           context: context,
-          index: index,
+          index: index
         )
       case (.none, .some(let listValue), true):
         .init(
           value: .list(try .init(from: listValue, mapper: Element.init(from:))),
           context: context,
-          index: index,
+          index: index
         )
       default: throw .code(.invalidSetOrListObject)
       }
   }
 }
 
-extension JSONLDValue.SetOrListObject {
+extension JSONLDValue.SetOrListObject: Equatable {
+  /// Returns a Boolean value indicating whether two values are equal.
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.valueEntry.term == rhs.valueEntry.term
       && lhs.valueEntry.value == rhs.valueEntry.value
@@ -176,5 +205,37 @@ extension JSONLDValue.SetOrListObject {
       && lhs.contextEntry?.value == rhs.contextEntry?.value
       && lhs.indexEntry?.term == rhs.indexEntry?.term
       && lhs.indexEntry?.value == rhs.indexEntry?.value
+  }
+}
+
+extension JSONLDValue.SetOrListObject {
+  init(alreadyProcessed jsonObject: JSONObject) throws(JSONLDError) {
+    var properties = jsonObject
+    let context = try properties.extractContext()
+    let index = try properties.extractIndex()
+
+    let (valueTerm, valueJson, isList) =
+      if let val = properties.removeValue(for: .set) {
+        (nil as String?, val, false)
+      } else if let val = properties.removeValue(for: .list) {
+        (nil as String?, val, true)
+      } else {
+        throw .internalError(.notSetOrListObject)
+      }
+
+    guard properties.isEmpty else {
+      throw .code(.invalidSetOrListObject)
+    }
+
+    let value: Value =
+      if isList {
+        .list(try .init(from: valueJson, mapper: Element.init(alreadyProcessed:)))
+      } else {
+        .set(try .init(from: valueJson, mapper: Element.init(alreadyProcessed:)))
+      }
+
+    self.valueEntry = (term: valueTerm, value: value)
+    self.contextEntry = context.map { (term: nil, value: $0) }
+    self.indexEntry = index.map { (term: nil, value: $0) }
   }
 }

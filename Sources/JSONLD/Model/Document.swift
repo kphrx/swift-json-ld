@@ -24,6 +24,13 @@ public struct JSONLDDocument<P: JSONLDPhase>: Equatable, CustomJSONValueConverti
     self.value.jsonValue
   }
 
+  /// Returns this document as a collection of JSON-LD values.
+  public var values: JSONLDValues<P> {
+    .init(.many(self.value.map(JSONLDValue<P>.node)))
+  }
+}
+
+extension JSONLDDocument where P == Unresolved {
   init(validating jsonValue: JSONValue) throws(JSONLDError) {
     self.init(
       try .init(from: jsonValue) { jsonValue throws(JSONLDError) in
@@ -35,9 +42,9 @@ public struct JSONLDDocument<P: JSONLDPhase>: Equatable, CustomJSONValueConverti
     )
   }
 
-  /// Returns this document as a collection of JSON-LD values.
-  public var values: JSONLDValues<P> {
-    .init(.many(self.value.map(JSONLDValue<P>.node)))
+  /// Creates an unresolved document from a JSON value.
+  public init(from jsonValue: JSONValue) throws(JSONLDError) {
+    try self.init(validating: jsonValue)
   }
 }
 
@@ -48,13 +55,6 @@ extension JSONLDDocument: Decodable where P == Unresolved {
   /// as `Expanded` documents should only be created through the expansion algorithm.
   public init(from decoder: Decoder) throws {
     let jsonValue = try JSONValue(from: decoder)
-    try self.init(validating: jsonValue)
-  }
-}
-
-extension JSONLDDocument where P == Unresolved {
-  /// Creates an unresolved document from a JSON value.
-  public init(from jsonValue: JSONValue) throws(JSONLDError) {
     try self.init(validating: jsonValue)
   }
 }
