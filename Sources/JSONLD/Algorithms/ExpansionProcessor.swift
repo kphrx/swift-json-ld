@@ -337,10 +337,9 @@ enum ExpansionProcessor {
     let indexValue = setOrList.index
     switch setOrList.value {
     case .set(let values):
-      let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
       let expanded = try await self.expand(
         activeContext,
-        value: .many(unresolvedItems),
+        value: values.preserveMap { .init($0) },
         property: property,
         insideList: insideList,
         loader: loader
@@ -354,10 +353,9 @@ enum ExpansionProcessor {
       )
     case .list(let values):
       if insideList { throw .code(.listOfLists) }
-      let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
       let expanded = try await self.expand(
         activeContext,
-        value: .many(unresolvedItems),
+        value: values.preserveMap { .init($0) },
         property: property,
         insideList: true,
         loader: loader
@@ -410,10 +408,9 @@ enum ExpansionProcessor {
   ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
     var expandedItems: [JSONLDValue<Expanded>] = []
     for (_, values) in indexMap.map.sorted(by: { $0.key < $1.key }) {
-      let unresolvedItems = values.map { JSONLDValue<Unresolved>($0) }
       let expanded = try await self.expand(
         activeContext,
-        value: .many(unresolvedItems),
+        value: values.preserveMap { .init($0) },
         property: property,
         insideList: insideList,
         loader: loader
@@ -809,7 +806,6 @@ enum ExpansionProcessor {
             values.append(
               .node(
                 .init(
-                  context: node.context,
                   id: node.id,
                   graph: node.graph,
                   type: node.type,
@@ -826,7 +822,6 @@ enum ExpansionProcessor {
                   .init(
                     value: val.value,
                     language: language,
-                    context: val.context,
                     index: val.index ?? index
                   )
                 )
@@ -837,7 +832,6 @@ enum ExpansionProcessor {
                   .init(
                     value: val.value,
                     type: val.type,
-                    context: val.context,
                     index: val.index ?? index
                   )
                 )
@@ -848,7 +842,6 @@ enum ExpansionProcessor {
               .setOrList(
                 .init(
                   value: object.value,
-                  context: object.context,
                   index: object.index ?? index
                 )
               )

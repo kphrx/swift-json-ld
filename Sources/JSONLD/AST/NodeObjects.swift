@@ -36,15 +36,6 @@ extension JSONLDValue.NodeObject {
         case .node(let node): node.jsonValue
         }
       }
-
-      init(alreadyProcessed jsonValue: JSONValue) throws(JSONLDError) {
-        self =
-          switch jsonValue {
-          case .string(let value): .iri(value)
-          case .object(let object): .node(try .init(alreadyProcessed: object))
-          default: throw .code(.invalidReversePropertyValue)
-          }
-      }
     }
 
     let map: [String: SingleOrMany<Value>]
@@ -56,83 +47,6 @@ extension JSONLDValue.NodeObject {
 
     init(map: [String: SingleOrMany<Value>]) {
       self.map = map
-    }
-
-    init(alreadyProcessed jsonObject: JSONObject) throws(JSONLDError) {
-      var map: [String: SingleOrMany<Value>] = [:]
-
-      for (key, value) in jsonObject {
-        if key.hasPrefix("@") {
-          throw .code(.invalidReversePropertyMap)
-        }
-        map[key] = try .init(from: value, mapper: Value.init(alreadyProcessed:))
-      }
-
-      self.map = map
-    }
-  }
-}
-
-extension JSONLDValue.NodeObject {
-  init(alreadyProcessed jsonObject: JSONObject) throws(JSONLDError) {
-    var properties = jsonObject
-
-    self.contextEntry = try properties.extractContext().map { (term: nil, value: $0) }
-
-    self.idEntry =
-      switch properties.removeValue(for: .id) {
-      case .string(let value)?: (term: nil, value: value)
-      case nil: nil
-      case _?: throw .code(.invalidIdValue)
-      }
-
-    self.graphEntry = try properties.removeValue(for: .graph).map {
-      graphValue throws(JSONLDError) -> GraphEntry? in
-      let graph: SingleOrMany<JSONLDValue<P>>?
-      switch graphValue {
-      case .object(let obj):
-        graph = .single(try .init(alreadyProcessed: .object(obj)))
-      case .array(let arr):
-        let values = try arr.map { jsonValue throws(JSONLDError) in
-          try JSONLDValue<P>(alreadyProcessed: jsonValue)
-        }
-        graph = values.isEmpty ? nil : .many(values)
-      case .null:
-        graph = nil
-      default:
-        throw .internalError(.notObject)
-      }
-      return graph.map { (term: nil, value: $0) }
-    }.flatMap { $0 }
-
-    self.typeEntry =
-      switch properties.removeValue(for: .type) {
-      case let typeValue?:
-        (
-          term: nil,
-          value: try .init(from: typeValue) { jsonValue throws(JSONLDError) in
-            if case .string(let value) = jsonValue {
-              value
-            } else {
-              throw .code(.invalidTypeValue)
-            }
-          }
-        )
-      case nil:
-        nil
-      }
-
-    self.reverseEntry =
-      switch properties.removeValue(for: .reverse) {
-      case .object(let value)?: (term: nil, value: try .init(alreadyProcessed: value))
-      case nil: nil
-      case _?: throw .code(.invalidReverseValue)
-      }
-
-    self.indexEntry = try properties.extractIndex().map { (term: nil, value: $0) }
-
-    self.properties = try properties.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
-      try .init(from: jsonValue, mapper: JSONLDValue<P>.init(alreadyProcessed:))
     }
   }
 }
@@ -196,7 +110,6 @@ extension JSONLDValue.NodeObject {
 
 extension JSONLDValue.NodeObject where P == Expanded {
   init(
-    context: Contexts? = nil,
     id: String? = nil,
     graph: SingleOrMany<JSONLDValue<Expanded>>? = nil,
     type: SingleOrMany<String>? = nil,
@@ -204,7 +117,26 @@ extension JSONLDValue.NodeObject where P == Expanded {
     index: String? = nil,
     properties: [String: SingleOrMany<JSONLDValue<Expanded>>] = [:]
   ) {
-    self.contextEntry = context.map { (term: nil, value: $0) }
+    self.contextEntry = nil
+    self.idEntry = id.map { (term: nil, value: $0) }
+    self.graphEntry = graph.map { (term: nil, value: $0) }
+    self.typeEntry = type.map { (term: nil, value: $0) }
+    self.reverseEntry = reverse.map { (term: nil, value: $0) }
+    self.indexEntry = index.map { (term: nil, value: $0) }
+    self.properties = properties
+  }
+}
+
+extension JSONLDValue.NodeObject where P == Flattened {
+  init(
+    id: String? = nil,
+    graph: SingleOrMany<JSONLDValue<Flattened>>? = nil,
+    type: SingleOrMany<String>? = nil,
+    reverse: ReversePropertyMap? = nil,
+    index: String? = nil,
+    properties: [String: SingleOrMany<JSONLDValue<Flattened>>] = [:]
+  ) {
+    self.contextEntry = nil
     self.idEntry = id.map { (term: nil, value: $0) }
     self.graphEntry = graph.map { (term: nil, value: $0) }
     self.typeEntry = type.map { (term: nil, value: $0) }

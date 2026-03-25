@@ -32,6 +32,18 @@ public indirect enum SingleOrMany<T: Equatable>: Equatable {
       self.init(try mapper(jsonValue))
     }
   }
+
+  /// Applies a transform to each element while preserving the single-or-many shape.
+  ///
+  /// - Parameter transform: The mapping function to apply to each element.
+  /// - Returns: A new `SingleOrMany` with transformed elements.
+  /// - Throws: Rethrows any error thrown by `transform`.
+  public func preserveMap<U, E>(_ transform: (T) throws(E) -> U) throws(E) -> SingleOrMany<U> {
+    switch self {
+    case .single(let value): .single(try transform(value))
+    case .many(let values): .many(try values.map(transform))
+    }
+  }
 }
 
 extension SingleOrMany: CustomJSONValueConvertible where T: CustomJSONValueConvertible {

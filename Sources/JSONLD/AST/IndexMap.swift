@@ -22,35 +22,7 @@ extension JSONLDValue.IndexMap {
   }
 }
 
-extension JSONLDValue.IndexMap {
-  init(alreadyProcessed jsonObject: JSONObject) throws(JSONLDError) {
-    self.map = try jsonObject.mapValuesWithTypedThrows { jsonValue throws(JSONLDError) in
-      try .init(from: jsonValue, mapper: Value.init(alreadyProcessed:))
-    }
-  }
-}
-
 extension JSONLDValue.IndexMap.Value {
-  init(alreadyProcessed jsonValue: JSONValue) throws(JSONLDError) {
-    self =
-      switch jsonValue {
-      case .string(let value): .string(value)
-      case .integer(let value): .integer(value)
-      case .float(let value): .float(value)
-      case .boolean(let value): .boolean(value)
-      case .null: .null
-      case .object(let jsonObject):
-        if jsonObject.contains(.value) {
-          try .valueObject(.init(alreadyProcessed: jsonObject))
-        } else if jsonObject.contains(.list) || jsonObject.contains(.set) {
-          try .setOrListObject(.init(alreadyProcessed: jsonObject))
-        } else {
-          try .nodeObject(.init(alreadyProcessed: jsonObject))
-        }
-      default: throw .code(.invalidIndexValue)
-      }
-  }
-
   /// Returns this index map value as a JSON value.
   public var jsonValue: JSONValue {
     switch self {

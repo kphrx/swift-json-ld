@@ -183,17 +183,27 @@ extension JSONLDValue.ValueObject where P == Compacted {
 
 extension JSONLDValue.ValueObject where P == Flattened {
   init(
-    value: ValueEntry,
-    type: TypeEntry? = nil,
-    language: LanguageEntry? = nil,
-    context: ContextEntry? = nil,
-    index: IndexEntry? = nil
+    value: Value,
+    language: String? = nil,
+    index: String? = nil
   ) {
-    self.valueEntry = value
-    self.typeEntry = type
-    self.languageEntry = language
-    self.contextEntry = context
-    self.indexEntry = index
+    self.valueEntry = (term: nil, value: value)
+    self.contextEntry = nil
+    self.indexEntry = index.map { (term: nil, value: $0) }
+    self.typeEntry = nil
+    self.languageEntry = language.map { (term: nil, value: $0) }
+  }
+
+  init(
+    value: Value,
+    type: ValueType?,
+    index: String? = nil
+  ) {
+    self.valueEntry = (term: nil, value: value)
+    self.contextEntry = nil
+    self.indexEntry = index.map { (term: nil, value: $0) }
+    self.typeEntry = type.map { (term: nil, value: $0) }
+    self.languageEntry = nil
   }
 }
 
@@ -249,33 +259,5 @@ extension JSONLDValue.ValueObject where P == Unresolved {
       default: throw .code(.invalidLanguageTaggedValue)
       }
     }
-  }
-}
-
-extension JSONLDValue.ValueObject {
-  init(alreadyProcessed jsonObject: JSONObject) throws(JSONLDError) {
-    var properties = jsonObject
-    guard let value = properties.removeValue(for: .value) else {
-      throw .internalError(.notValueObject)
-    }
-    self.valueEntry = (term: nil, value: try .init(from: value))
-
-    self.contextEntry = try properties.extractContext().map { (term: nil, value: $0) }
-
-    self.languageEntry =
-      switch properties.removeValue(for: .language) {
-      case .string(let language)?: (term: nil, value: language)
-      case nil: nil
-      case _?: throw .code(.invalidLanguageTaggedString)
-      }
-
-    self.typeEntry =
-      switch properties.removeValue(for: .type) {
-      case .string(let type)?: (term: nil, value: try .init(type))
-      case nil: nil
-      case _?: throw .code(.invalidTypedValue)
-      }
-
-    self.indexEntry = try properties.extractIndex().map { (term: nil, value: $0) }
   }
 }

@@ -29,25 +29,6 @@ extension JSONLDValue.SetOrListObject {
     case null
     case nodeObject(JSONLDValue.NodeObject)
     case valueObject(JSONLDValue.ValueObject)
-
-    init(alreadyProcessed jsonValue: JSONValue) throws(JSONLDError) {
-      self =
-        switch jsonValue {
-        case .string(let value): .string(value)
-        case .integer(let value): .integer(value)
-        case .float(let value): .float(value)
-        case .boolean(let value): .boolean(value)
-        case .null: .null
-        case .object(let jsonObject):
-          if jsonObject.contains(.value) {
-            try .valueObject(.init(alreadyProcessed: jsonObject))
-          } else {
-            try .nodeObject(.init(alreadyProcessed: jsonObject))
-          }
-        default:
-          throw .code(.listOfLists)
-        }
-    }
   }
 }
 
@@ -163,6 +144,14 @@ extension JSONLDValue.SetOrListObject where P == Expanded {
   }
 }
 
+extension JSONLDValue.SetOrListObject where P == Flattened {
+  init(value: Value, index: String? = nil) {
+    self.valueEntry = (term: nil, value: value)
+    self.contextEntry = nil
+    self.indexEntry = index.map { (term: nil, value: $0) }
+  }
+}
+
 extension JSONLDValue.SetOrListObject where P == Compacted {
   init(
     value: ValueEntry,
@@ -223,37 +212,5 @@ extension JSONLDValue.SetOrListObject: Equatable {
       && lhs.contextEntry?.value == rhs.contextEntry?.value
       && lhs.indexEntry?.term == rhs.indexEntry?.term
       && lhs.indexEntry?.value == rhs.indexEntry?.value
-  }
-}
-
-extension JSONLDValue.SetOrListObject {
-  init(alreadyProcessed jsonObject: JSONObject) throws(JSONLDError) {
-    var properties = jsonObject
-    let context = try properties.extractContext()
-    let index = try properties.extractIndex()
-
-    let (valueTerm, valueJson, isList) =
-      if let val = properties.removeValue(for: .set) {
-        (nil as String?, val, false)
-      } else if let val = properties.removeValue(for: .list) {
-        (nil as String?, val, true)
-      } else {
-        throw .internalError(.notSetOrListObject)
-      }
-
-    guard properties.isEmpty else {
-      throw .code(.invalidSetOrListObject)
-    }
-
-    let value: Value =
-      if isList {
-        .list(try .init(from: valueJson, mapper: Element.init(alreadyProcessed:)))
-      } else {
-        .set(try .init(from: valueJson, mapper: Element.init(alreadyProcessed:)))
-      }
-
-    self.valueEntry = (term: valueTerm, value: value)
-    self.contextEntry = context.map { (term: nil, value: $0) }
-    self.indexEntry = index.map { (term: nil, value: $0) }
   }
 }

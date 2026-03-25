@@ -117,9 +117,9 @@ extension JSONLDValue where P == Flattened {
     self =
       switch value {
       case .string(let s): .iriOrTerm(s)
-      case .integer(let i): .value(.init(value: (term: nil, value: .integer(i))))
-      case .float(let f): .value(.init(value: (term: nil, value: .float(f))))
-      case .boolean(let b): .value(.init(value: (term: nil, value: .boolean(b))))
+      case .integer(let i): .value(.init(value: .integer(i)))
+      case .float(let f): .value(.init(value: .float(f)))
+      case .boolean(let b): .value(.init(value: .boolean(b)))
       case .null: .invalid(.notJSONLDValue)
       case .nodeObject(let n): .node(n)
       case .valueObject(let v): .value(v)
@@ -130,9 +130,9 @@ extension JSONLDValue where P == Flattened {
     self =
       switch value {
       case .string(let s): .iriOrTerm(s)
-      case .integer(let i): .value(.init(value: (term: nil, value: .integer(i))))
-      case .float(let f): .value(.init(value: (term: nil, value: .float(f))))
-      case .boolean(let b): .value(.init(value: (term: nil, value: .boolean(b))))
+      case .integer(let i): .value(.init(value: .integer(i)))
+      case .float(let f): .value(.init(value: .float(f)))
+      case .boolean(let b): .value(.init(value: .boolean(b)))
       case .null: .invalid(.notJSONLDValue)
       case .nodeObject(let n): .node(n)
       case .valueObject(let v): .value(v)
