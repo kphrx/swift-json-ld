@@ -1,0 +1,9 @@
+**/*.yml
+.gitignore
+.swift-format
+Package.resolved
+Package.swift
+Package@swift-*.swift
+LICENSE
+NOTICE
+README.md
