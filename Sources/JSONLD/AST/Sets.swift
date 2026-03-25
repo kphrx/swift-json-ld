@@ -74,10 +74,6 @@ extension JSONLDValue.SetOrListObject.Element {
 }
 
 extension JSONLDValue.SetOrListObject.Element where P == Unresolved {
-  static func from(_ jsonArray: JSONArray) throws(JSONLDError) -> [Self] {
-    try jsonArray.map(Self.init(from:))
-  }
-
   /// Creates an element from a JSON value.
   public init(from jsonValue: JSONValue) throws(JSONLDError) {
     self =
@@ -137,16 +133,16 @@ extension JSONLDValue.SetOrListObject {
 }
 
 extension JSONLDValue.SetOrListObject where P == Expanded {
-  init(value: Value, context: Contexts? = nil, index: String? = nil) {
-    self.valueEntry = (term: nil, value: value)
+  init(list: [Element], context: Contexts? = nil, index: String? = nil) {
+    self.valueEntry = (term: nil, value: .list(.many(list)))
     self.contextEntry = context.map { (term: nil, value: $0) }
     self.indexEntry = index.map { (term: nil, value: $0) }
   }
 }
 
 extension JSONLDValue.SetOrListObject where P == Flattened {
-  init(value: Value, index: String? = nil) {
-    self.valueEntry = (term: nil, value: value)
+  init(list: [Element], index: String? = nil) {
+    self.valueEntry = (term: nil, value: .list(.many(list)))
     self.contextEntry = nil
     self.indexEntry = index.map { (term: nil, value: $0) }
   }

@@ -44,10 +44,6 @@ extension JSONLDValue.NodeObject {
     public var jsonObject: JSONObject {
       self.map.jsonObject
     }
-
-    init(map: [String: SingleOrMany<Value>]) {
-      self.map = map
-    }
   }
 }
 
@@ -111,38 +107,38 @@ extension JSONLDValue.NodeObject {
 extension JSONLDValue.NodeObject where P == Expanded {
   init(
     id: String? = nil,
-    graph: SingleOrMany<JSONLDValue<Expanded>>? = nil,
-    type: SingleOrMany<String>? = nil,
+    graph: [JSONLDValue<Expanded>]? = nil,
+    type: [String]? = nil,
     reverse: ReversePropertyMap? = nil,
     index: String? = nil,
-    properties: [String: SingleOrMany<JSONLDValue<Expanded>>] = [:]
+    properties: [String: [JSONLDValue<Expanded>]] = [:]
   ) {
     self.contextEntry = nil
     self.idEntry = id.map { (term: nil, value: $0) }
-    self.graphEntry = graph.map { (term: nil, value: $0) }
-    self.typeEntry = type.map { (term: nil, value: $0) }
+    self.graphEntry = graph.map { (term: nil, value: .many($0)) }
+    self.typeEntry = type.map { (term: nil, value: .many($0)) }
     self.reverseEntry = reverse.map { (term: nil, value: $0) }
     self.indexEntry = index.map { (term: nil, value: $0) }
-    self.properties = properties
+    self.properties = properties.mapValues { .many($0) }
   }
 }
 
 extension JSONLDValue.NodeObject where P == Flattened {
   init(
     id: String? = nil,
-    graph: SingleOrMany<JSONLDValue<Flattened>>? = nil,
-    type: SingleOrMany<String>? = nil,
+    graph: [JSONLDValue<Flattened>]? = nil,
+    type: [String]? = nil,
     reverse: ReversePropertyMap? = nil,
     index: String? = nil,
-    properties: [String: SingleOrMany<JSONLDValue<Flattened>>] = [:]
+    properties: [String: [JSONLDValue<Flattened>]] = [:]
   ) {
     self.contextEntry = nil
     self.idEntry = id.map { (term: nil, value: $0) }
-    self.graphEntry = graph.map { (term: nil, value: $0) }
-    self.typeEntry = type.map { (term: nil, value: $0) }
+    self.graphEntry = graph.map { (term: nil, value: .many($0)) }
+    self.typeEntry = type.map { (term: nil, value: .many($0)) }
     self.reverseEntry = reverse.map { (term: nil, value: $0) }
     self.indexEntry = index.map { (term: nil, value: $0) }
-    self.properties = properties
+    self.properties = properties.mapValues { .many($0) }
   }
 }
 
@@ -277,6 +273,24 @@ extension JSONLDValue.NodeObject.ReversePropertyMap where P == Unresolved {
       map[key] = try .init(from: value, mapper: Value.init(from:))
     }
 
+    self.map = map
+  }
+}
+
+extension JSONLDValue.NodeObject.ReversePropertyMap where P == Expanded {
+  init(map: [String: [Value]]) {
+    self.map = map.mapValues { .many($0) }
+  }
+}
+
+extension JSONLDValue.NodeObject.ReversePropertyMap where P == Flattened {
+  init(map: [String: [Value]]) {
+    self.map = map.mapValues { .many($0) }
+  }
+}
+
+extension JSONLDValue.NodeObject.ReversePropertyMap where P == Compacted {
+  init(map: [String: SingleOrMany<Value>]) {
     self.map = map
   }
 }

@@ -48,25 +48,14 @@ enum ExpansionProcessor {
   ) async throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     var result: [JSONLDValue<Expanded>] = []
     for item in value {
-      guard
-        let expanded = try await self.expand(
-          activeContext,
-          value: item,
-          property: property,
-          insideList: insideList,
-          loader: loader
-        )
-      else {
-        continue
-      }
-
-      if case .setOrList(let setOrList) = expanded,
-        case .set(let values) = setOrList.value
-      {
-        result.append(contentsOf: values.map { JSONLDValue<Expanded>($0) })
-      } else {
-        result.append(expanded)
-      }
+      let expanded = try await self.expand(
+        activeContext,
+        value: item,
+        property: property,
+        insideList: insideList,
+        loader: loader
+      )
+      result.append(contentsOf: expanded)
     }
     return result
   }
@@ -77,7 +66,7 @@ enum ExpansionProcessor {
     property: String?,
     insideList: Bool = false,
     loader: (any JSONLDDocumentLoader)? = nil
-  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+  ) async throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     switch value {
     case .unknown(let content):
       try await self.expandObject(
@@ -92,19 +81,35 @@ enum ExpansionProcessor {
       try self.handleInvalidValue(invalid)
 
     case .iriOrTerm(let string):
-      try self.expandScalar(activeContext, value: string, property: property)
+      if let expanded = try self.expandScalar(activeContext, value: string, property: property) {
+        [expanded]
+      } else {
+        []
+      }
 
     case .integer(let integer):
-      try self.expandScalar(activeContext, value: integer, property: property)
+      if let expanded = try self.expandScalar(activeContext, value: integer, property: property) {
+        [expanded]
+      } else {
+        []
+      }
 
     case .float(let float):
-      try self.expandScalar(activeContext, value: float, property: property)
+      if let expanded = try self.expandScalar(activeContext, value: float, property: property) {
+        [expanded]
+      } else {
+        []
+      }
 
     case .boolean(let boolean):
-      try self.expandScalar(activeContext, value: boolean, property: property)
+      if let expanded = try self.expandScalar(activeContext, value: boolean, property: property) {
+        [expanded]
+      } else {
+        []
+      }
 
     case .null:
-      nil
+      []
 
     case .node(let nodeObject):
       try await self.expandNode(
@@ -149,10 +154,10 @@ enum ExpansionProcessor {
 
   private static func handleInvalidValue(
     _ invalid: JSONLDValue<Unresolved>.InvalidValue
-  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
+  ) throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     switch invalid {
     case .listOfLists: throw .code(.listOfLists)
-    case .notJSONLDValue: nil
+    case .notJSONLDValue: []
     }
   }
 
@@ -271,7 +276,7 @@ enum ExpansionProcessor {
     property: String?,
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
-  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+  ) async throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     var activeContext = activeContext
     if let localContext = node.context {
       activeContext = try await activeContext.process(
@@ -313,7 +318,7 @@ enum ExpansionProcessor {
     property: String?,
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
-  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+  ) async throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     let object = try value.jsonObject.mapValuesWithTypedThrows {
       jsonValue throws(JSONLDError) -> SingleOrMany<JSONLDValue<Unresolved>> in
       try .init(from: jsonValue, mapper: JSONLDValue<Unresolved>.init(from:))
@@ -333,7 +338,7 @@ enum ExpansionProcessor {
     property: String?,
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
-  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+  ) async throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     let indexValue = setOrList.index
     switch setOrList.value {
     case .set(let values):
@@ -344,13 +349,7 @@ enum ExpansionProcessor {
         insideList: insideList,
         loader: loader
       )
-      return .setOrList(
-        .init(
-          value: .set(.many(expanded.map { JSONLDValue<Expanded>.SetOrListObject.Element($0) })),
-          context: nil,
-          index: indexValue
-        )
-      )
+      return expanded
     case .list(let values):
       if insideList { throw .code(.listOfLists) }
       let expanded = try await self.expand(
@@ -367,20 +366,22 @@ enum ExpansionProcessor {
         }
       }
 
-      return .setOrList(
-        .init(
-          value: .list(.many(expanded.map { JSONLDValue<Expanded>.SetOrListObject.Element($0) })),
-          context: nil,
-          index: indexValue
+      return [
+        .setOrList(
+          .init(
+            list: expanded.map { JSONLDValue<Expanded>.SetOrListObject.Element($0) },
+            context: nil,
+            index: indexValue
+          )
         )
-      )
+      ]
     }
   }
 
   private static func expandLanguageMap(
     _ activeContext: ActiveContext,
     languageMap: JSONLDValue<Unresolved>.LanguageMap
-  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
+  ) throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     var expandedItems: [JSONLDValue<Expanded>] = []
     for (lang, values) in languageMap.map.sorted(by: { $0.key < $1.key }) {
       for val in values {
@@ -390,13 +391,7 @@ enum ExpansionProcessor {
         )
       }
     }
-    return .setOrList(
-      .init(
-        value: .set(.many(expandedItems.map { JSONLDValue<Expanded>.SetOrListObject.Element($0) })),
-        context: nil,
-        index: nil
-      )
-    )
+    return expandedItems
   }
 
   private static func expandIndexMap(
@@ -405,7 +400,7 @@ enum ExpansionProcessor {
     property: String?,
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)?
-  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+  ) async throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     var expandedItems: [JSONLDValue<Expanded>] = []
     for (_, values) in indexMap.map.sorted(by: { $0.key < $1.key }) {
       let expanded = try await self.expand(
@@ -417,13 +412,7 @@ enum ExpansionProcessor {
       )
       expandedItems.append(contentsOf: expanded)
     }
-    return .setOrList(
-      .init(
-        value: .set(.many(expandedItems.map { JSONLDValue<Expanded>.SetOrListObject.Element($0) })),
-        context: nil,
-        index: nil
-      )
-    )
+    return expandedItems
   }
 
   private static func expandObject(
@@ -432,7 +421,7 @@ enum ExpansionProcessor {
     property: String?,
     insideList: Bool,
     loader: (any JSONLDDocumentLoader)? = nil
-  ) async throws(JSONLDError) -> JSONLDValue<Expanded>? {
+  ) async throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     var object = object
     var activeContext = activeContext
 
@@ -531,17 +520,6 @@ enum ExpansionProcessor {
       property: property,
       activeContext: activeContext
     )
-  }
-
-  private static func arrayValue<T>(_ value: SingleOrMany<T>?) -> [T] {
-    switch value {
-    case .single(let single)?:
-      [single]
-    case .many(let values)?:
-      values
-    case .none:
-      []
-    }
   }
 
   private static func expandIdKeyword(
@@ -678,46 +656,46 @@ enum ExpansionProcessor {
         throw .code(.invalidReversePropertyMap)
       }
 
-    if let expandedReverse = try await self.expandObject(
+    let expandedReverse = try await self.expandObject(
       activeContext,
       object: reverseObject,
       property: "@reverse",
       insideList: false,
       loader: loader
-    ),
-      case .node(let node) = expandedReverse
-    {
-      if let reverse = node.reverse {
-        for (mapKey, mapValue) in reverse.map {
-          let values = self.arrayValue(mapValue).map { value -> JSONLDValue<Expanded> in
-            switch value {
-            case .node(let node): .node(node)
-            case .iri(let iri): .iriOrTerm(iri)
-            }
-          }
-          builder.reverse[mapKey] = (builder.reverse[mapKey] ?? []) + values
-        }
-      }
+    )
 
-      for (key, val) in node.properties {
-        let values = self.arrayValue(val)
-        builder.properties[key] = (builder.properties[key] ?? []) + values
-      }
-      if let id = node.id {
-        builder.properties["@id"] = (builder.properties["@id"] ?? []) + [.iriOrTerm(id)]
-      }
-      if let types = node.type {
-        builder.properties["@type"] =
-          (builder.properties["@type"] ?? []) + types.map { .iriOrTerm($0) }
-      }
-      if let graph = node.graph {
-        builder.properties["@graph"] = (builder.properties["@graph"] ?? []) + self.arrayValue(graph)
-      }
-      if let index = node.index {
-        builder.properties["@index"] = (builder.properties["@index"] ?? []) + [.iriOrTerm(index)]
-      }
-    } else {
+    guard expandedReverse.count == 1, case .node(let node) = expandedReverse[0] else {
       throw .code(.invalidReversePropertyMap)
+    }
+
+    if let reverse = node.reverse {
+      for (mapKey, mapValue) in reverse.map {
+        let values = mapValue.map { value -> JSONLDValue<Expanded> in
+          switch value {
+          case .node(let node): .node(node)
+          case .iri(let iri): .iriOrTerm(iri)
+          }
+        }
+        builder.reverse[mapKey] = (builder.reverse[mapKey] ?? []) + values
+      }
+    }
+
+    for (key, val) in node.properties {
+      let values = val.map { $0 }
+      builder.properties[key] = (builder.properties[key] ?? []) + values
+    }
+    if let id = node.id {
+      builder.properties["@id"] = (builder.properties["@id"] ?? []) + [.iriOrTerm(id)]
+    }
+    if let types = node.type {
+      builder.properties["@type"] =
+        (builder.properties["@type"] ?? []) + types.map { .iriOrTerm($0) }
+    }
+    if let graph = node.graph {
+      builder.properties["@graph"] = (builder.properties["@graph"] ?? []) + graph.map { $0 }
+    }
+    if let index = node.index {
+      builder.properties["@index"] = (builder.properties["@index"] ?? []) + [.iriOrTerm(index)]
     }
   }
 
@@ -807,11 +785,11 @@ enum ExpansionProcessor {
               .node(
                 .init(
                   id: node.id,
-                  graph: node.graph,
-                  type: node.type,
+                  graph: node.graph?.map { $0 },
+                  type: node.type?.map { $0 },
                   reverse: node.reverse,
                   index: node.index ?? index,
-                  properties: node.properties
+                  properties: node.properties.mapValues { $0.map { $0 } }
                 )
               )
             )
@@ -838,14 +816,20 @@ enum ExpansionProcessor {
               )
             }
           case .setOrList(let object):
-            values.append(
-              .setOrList(
-                .init(
-                  value: object.value,
-                  index: object.index ?? index
+            switch object.value {
+            case .list(let listValues):
+              let listElements = Array(listValues)
+              values.append(
+                .setOrList(
+                  .init(
+                    list: listElements,
+                    index: object.index ?? index
+                  )
                 )
               )
-            )
+            case .set:
+              fatalError("Expanded set objects are not supported")
+            }
           default:
             values.append(item)
           }
@@ -907,7 +891,7 @@ enum ExpansionProcessor {
           [
             .setOrList(
               .init(
-                value: .list(.many(self.listItems(for: expandedValues))),
+                list: self.listItems(for: expandedValues),
                 context: nil,
                 index: nil
               )
@@ -926,7 +910,7 @@ enum ExpansionProcessor {
     _ builder: inout ExpandedObjectBuilder,
     property: String?,
     activeContext: ActiveContext
-  ) throws(JSONLDError) -> JSONLDValue<Expanded>? {
+  ) throws(JSONLDError) -> [JSONLDValue<Expanded>] {
     if let value = builder.value {
       if !builder.properties.isEmpty || builder.id != nil || builder.graph != nil
         || !builder.reverse.isEmpty || builder.list != nil || builder.set != nil
@@ -937,7 +921,7 @@ enum ExpansionProcessor {
         throw .code(.invalidValueObject)
       }
 
-      if case .null = value { return nil }
+      if case .null = value { return [] }
       if builder.language != nil {
         if case .string = value {} else { throw .code(.invalidLanguageTaggedValue) }
       }
@@ -952,17 +936,21 @@ enum ExpansionProcessor {
 
       // If property is null or @graph, and it's a value object, it's dropped.
       if property == nil || property == "@graph" {
-        return nil
+        return []
       }
 
       if let language = builder.language {
-        return .value(
-          .init(value: value, language: language, index: builder.index)
-        )
+        return [
+          .value(
+            .init(value: value, language: language, index: builder.index)
+          )
+        ]
       } else {
-        return .value(
-          .init(value: value, type: type, index: builder.index)
-        )
+        return [
+          .value(
+            .init(value: value, type: type, index: builder.index)
+          )
+        ]
       }
     }
 
@@ -975,11 +963,17 @@ enum ExpansionProcessor {
       }
       // If property is null or @graph, and it's a list object, it's dropped.
       if property == nil || property == "@graph" {
-        return nil
+        return []
       }
-      return .setOrList(
-        .init(value: .list(.many(self.listItems(for: list))), context: nil, index: builder.index)
-      )
+      return [
+        .setOrList(
+          .init(
+            list: self.listItems(for: list),
+            context: nil,
+            index: builder.index
+          )
+        )
+      ]
     }
 
     if let set = builder.set {
@@ -989,23 +983,7 @@ enum ExpansionProcessor {
       {
         throw .code(.invalidSetOrListObject)
       }
-      // If property is null or @graph, and it's a set object, return its @set value.
-      if property == nil || property == "@graph" {
-        return .setOrList(
-          .init(
-            value: .set(.many(self.listItems(for: set))),
-            context: nil,
-            index: nil
-          )
-        )
-      }
-      return .setOrList(
-        .init(
-          value: .set(.many(self.listItems(for: set))),
-          context: nil,
-          index: builder.index
-        )
-      )
+      return set
     }
 
     // Step 13.4.12: if element contains only the @language keyword, the result is set to null.
@@ -1013,17 +991,17 @@ enum ExpansionProcessor {
       builder.list == nil, builder.set == nil, builder.graph == nil, builder.reverse.isEmpty,
       builder.properties.isEmpty, builder.language != nil
     {
-      return nil
+      return []
     }
 
     if property == nil || property == "@graph" {
       if builder.isEmpty {
-        return nil
+        return []
       }
       if builder.properties.isEmpty, builder.types.isEmpty, builder.graph == nil,
         builder.reverse.isEmpty, builder.id != nil
       {
-        return nil
+        return []
       }
     }
 
@@ -1031,37 +1009,27 @@ enum ExpansionProcessor {
       if !builder.reverse.isEmpty {
         .init(
           map: builder.reverse.mapValues {
-            .many(
-              $0.compactMap {
-                if case .node(let node) = $0 { .node(node) } else { nil }
-              }
-            )
+            $0.compactMap {
+              if case .node(let node) = $0 { .node(node) } else { nil }
+            }
           }
         )
       } else {
         nil
       }
 
-    return .node(
-      .init(
-        id: builder.id,
-        graph: builder.graph.map { .many($0) },
-        type: builder.types.isEmpty ? nil : .many(builder.types),
-        reverse: reverseEntry,
-        index: builder.index,
-        properties: builder.properties.mapValues { .many($0) }
+    return [
+      .node(
+        .init(
+          id: builder.id,
+          graph: builder.graph,
+          type: builder.types.isEmpty ? nil : builder.types,
+          reverse: reverseEntry,
+          index: builder.index,
+          properties: builder.properties
+        )
       )
-    )
-  }
-
-  private static func validateIRI(
-    _ iri: String,
-    code: JSONLDError.Code
-  ) throws(JSONLDError) -> String {
-    if iri.contains(":") || JSONLDKeyword(rawValue: iri) != nil || iri.hasPrefix("_:") {
-      return iri
-    }
-    throw .code(code)
+    ]
   }
 
   private static func listItems(
@@ -1071,7 +1039,7 @@ enum ExpansionProcessor {
       case .setOrList(let object) = values[0],
       case .list(let listValues) = object.value
     {
-      return self.arrayValue(listValues)
+      return listValues.map { $0 }
     }
     return values.compactMap { value in
       switch value {
@@ -1153,25 +1121,6 @@ enum ExpansionProcessor {
       return prefix.allSatisfy { $0.isLetter || $0.isNumber || $0 == "+" || $0 == "-" || $0 == "." }
     }
     return false
-  }
-
-  private static func mergeProperty(_ properties: inout JSONObject, key: String, value: JSONValue) {
-    if let existing = properties[key] {
-      if case .array(var existingArray) = existing {
-        if case .array(let newArray) = value {
-          existingArray.append(contentsOf: newArray)
-        } else {
-          existingArray.append(value)
-        }
-        properties[key] = .array(existingArray)
-      } else if case .array(let newArray) = value {
-        properties[key] = .array([existing] + newArray)
-      } else {
-        properties[key] = .array([existing, value])
-      }
-    } else {
-      properties[key] = value
-    }
   }
 }
 

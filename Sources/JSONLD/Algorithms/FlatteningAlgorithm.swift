@@ -108,10 +108,10 @@ struct FlatteningAlgorithm {
           } else {
             return .init(
               id: builder.id,
-              graph: builder.graph.map { .many($0) },
-              type: builder.types.isEmpty ? nil : .many(builder.types),
+              graph: builder.graph,
+              type: builder.types.isEmpty ? nil : builder.types,
               index: builder.index,
-              properties: builder.properties.mapValues { .many($0) }
+              properties: builder.properties
             )
           }
         }
@@ -130,10 +130,10 @@ struct FlatteningAlgorithm {
         } else {
           return .init(
             id: builder.id,
-            graph: builder.graph.map { .many($0) },
-            type: builder.types.isEmpty ? nil : .many(builder.types),
+            graph: builder.graph,
+            type: builder.types.isEmpty ? nil : builder.types,
             index: builder.index,
-            properties: builder.properties.mapValues { .many($0) }
+            properties: builder.properties
           )
         }
       }
@@ -198,9 +198,7 @@ struct FlatteningAlgorithm {
 
         let listValue: JSONLDValue<Flattened> = .setOrList(
           .init(
-            value: .list(
-              .many(resultList)
-            ),
+            list: resultList,
             index: nil
           )
         )
@@ -302,10 +300,10 @@ struct FlatteningAlgorithm {
 
           let reverseNodeWithID = JSONLDValue<Expanded>.NodeObject(
             id: reverseNodeID,
-            graph: reverseNode.graph,
-            type: reverseNode.type,
+            graph: reverseNode.graph?.map { $0 },
+            type: reverseNode.type?.map { $0 },
             index: reverseNode.index,
-            properties: reverseNode.properties
+            properties: reverseNode.properties.mapValues { $0.map { $0 } }
           )
 
           try _ = self.flattenNodeObject(
