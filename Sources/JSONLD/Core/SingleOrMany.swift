@@ -8,12 +8,13 @@ public indirect enum SingleOrMany<T: Equatable>: Equatable {
   case single(T)
   case many([T])
 
-  init(_ value: T) {
-    self = .single(value)
-  }
-
   init(_ values: T...) {
-    self = .many(values)
+    self =
+      if values.count > 1 {
+        .many(values)
+      } else {
+        .single(values[0])
+      }
   }
 
   init(_ values: [T]) {
@@ -43,12 +44,44 @@ extension SingleOrMany: CustomJSONValueConvertible where T: CustomJSONValueConve
   }
 }
 
-extension SingleOrMany: Sequence {
-  /// Returns an iterator over the elements.
-  public func makeIterator() -> AnyIterator<T> {
-    switch self {
-    case .single(let value): .init([value].makeIterator())
-    case .many(let values): .init(values.makeIterator())
+extension SingleOrMany: Collection {
+  /// Returns the element at the given position.
+  public subscript(position: Int) -> T {
+    precondition(position < self.endIndex, "Index out of range.")
+    return switch self {
+    case .single(let value): value
+    case .many(let values): values[position]
     }
+  }
+
+  /// The position of the first element.
+  public var startIndex: Int {
+    switch self {
+    case .single: 0
+    case .many(let values): values.startIndex
+    }
+  }
+
+  /// The position one past the last element.
+  public var endIndex: Int {
+    switch self {
+    case .single: 1
+    case .many(let values): values.endIndex
+    }
+  }
+
+  /// Returns the position immediately after the given index.
+  public func index(after i: Int) -> Int {
+    switch self {
+    case .single: 1
+    case .many(let values): values.index(after: i)
+    }
+  }
+}
+
+extension SingleOrMany: ExpressibleByArrayLiteral {
+  /// Creates a value from an array literal, preserving the `.many` shape.
+  public init(arrayLiteral elements: T...) {
+    self.init(elements)
   }
 }

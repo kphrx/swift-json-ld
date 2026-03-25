@@ -51,10 +51,28 @@ extension JSONLDValue.SetOrListObject {
   }
 }
 
-extension JSONLDValue.SetOrListObject.Value: Sequence {
-  func makeIterator() -> AnyIterator<JSONLDValue.SetOrListObject.Element> {
+extension JSONLDValue.SetOrListObject.Value: Collection {
+  subscript(position: Int) -> JSONLDValue.SetOrListObject.Element {
     switch self {
-    case .set(let values), .list(let values): values.makeIterator()
+    case .set(let values), .list(let values): values[position]
+    }
+  }
+
+  var startIndex: Int {
+    switch self {
+    case .set(let values), .list(let values): values.startIndex
+    }
+  }
+
+  var endIndex: Int {
+    switch self {
+    case .set(let values), .list(let values): values.endIndex
+    }
+  }
+
+  func index(after i: Int) -> Int {
+    switch self {
+    case .set(let values), .list(let values): values.index(after: i)
     }
   }
 }
