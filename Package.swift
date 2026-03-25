@@ -5,12 +5,22 @@ import PackageDescription
 
 let package = Package(
   name: "swift-json-codable",
+  platforms: [
+    .macOS(.v10_15),
+    .iOS(.v13),
+    .tvOS(.v13),
+    .watchOS(.v6),
+  ],
   products: [
     // Products define the executables and libraries a package produces, making them visible to other packages.
     .library(
       name: "JSONCodable",
       targets: ["JSONCodable"]
-    )
+    ),
+    .library(
+      name: "JSONLD",
+      targets: ["JSONLD"]
+    ),
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6")
@@ -24,6 +34,21 @@ let package = Package(
     .testTarget(
       name: "JSONCodableTests",
       dependencies: ["JSONCodable"]
+    ),
+    .target(
+      name: "JSONLD",
+      dependencies: ["JSONCodable"]
+    ),
+    .testTarget(
+      name: "JSONLDTests",
+      dependencies: ["JSONLD"]
+    ),
+    .testTarget(
+      name: "JSONLDTestSuiteTests",
+      dependencies: ["JSONLD"],
+      resources: [
+        .copy("Resources/Fixtures/")
+      ]
     ),
   ]
 )
