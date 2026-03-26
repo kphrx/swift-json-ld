@@ -1,5 +1,6 @@
 **/*.yml
 .gitignore
+.swift-version
 .swift-format
 Package.resolved
 Package.swift
