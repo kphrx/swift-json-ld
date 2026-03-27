@@ -1,6 +1,8 @@
 # swift-json-codable
 
+<!-- docc_landing_abstract_start -->
 swift-json-codable is a Swift 6 library for JSON value handling and JSON-LD 1.0 processing.
+<!-- docc_landing_abstract_end -->
 
 For usage examples and API references, see the [documentation](https://kpherox.dev/swift-json-codable/documentation/).
 

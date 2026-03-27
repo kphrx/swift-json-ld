@@ -235,6 +235,28 @@ jobs:
             --checkout-path "$PWD" --source-service github --source-service-base-url ${{ steps.docs-args.outputs.source_base_url }} \
             --transform-for-static-hosting ${{ steps.docs-args.outputs.base_path }}
 
+      - name: Patch documentation landing
+        run: |
+          abstract="$(
+            sed -n '/docc_landing_abstract_start/,/docc_landing_abstract_end/{
+              /docc_landing_abstract_start/d
+              /docc_landing_abstract_end/d
+              s/^[[:space:]]*//
+              s/[[:space:]]*$//
+              p
+            }' README.md \
+            | tr '\n' ' ' \
+            | sed -e 's/[[:space:]]\{1,\}/ /g' -e 's/^ //; s/ $//'
+          )"
+          if [ -z "$abstract" ]; then
+            echo "docc landing abstract not found" >&2
+            exit 1
+          fi
+          jq --arg text "$abstract" \
+            '.topicSectionsStyle = "list" | .abstract = [{"type":"text","text":$text}]' \
+            _site/data/documentation.json > _site/data/documentation.json.tmp
+          mv _site/data/documentation.json.tmp _site/data/documentation.json
+
       - name: Redirect /index.html to top level landing page
         run: |
           mv _site/{index,404}.html
