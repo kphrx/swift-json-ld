@@ -298,19 +298,13 @@ struct CompactionAlgorithm {
     )
   }
 
-  private func compactIdKeyword(
-    _ value: JSONValue,
-    into builder: inout NodeBuilder,
-  ) {
+  private func compactIdKeyword(_ value: JSONValue, into builder: inout NodeBuilder) {
     if let id = Self.stringValue(value) {
       builder.id = (term: self.term(for: .id), value: self.compactIRI(id, vocab: false))
     }
   }
 
-  private func compactTypeKeyword(
-    _ value: JSONValue,
-    into builder: inout NodeBuilder,
-  ) {
+  private func compactTypeKeyword(_ value: JSONValue, into builder: inout NodeBuilder) {
     if case .array(let types) = value {
       let compactedTypes = types.compactMap(Self.stringValue).map {
         self.compactIRI($0, vocab: true)
@@ -325,10 +319,7 @@ struct CompactionAlgorithm {
     }
   }
 
-  private func compactIndexKeyword(
-    _ value: JSONValue,
-    into builder: inout NodeBuilder,
-  ) {
+  private func compactIndexKeyword(_ value: JSONValue, into builder: inout NodeBuilder) {
     if let index = Self.stringValue(value) {
       builder.index = (term: self.term(for: .index), value: index)
     }
@@ -336,7 +327,7 @@ struct CompactionAlgorithm {
 
   private func compactGraphKeyword(
     _ value: JSONValue,
-    into builder: inout NodeBuilder,
+    into builder: inout NodeBuilder
   ) throws(JSONLDError) {
     let values =
       switch value {
