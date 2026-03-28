@@ -3,7 +3,7 @@
 
 /// A JSON-LD value that can be either a single item or an array of items.
 public indirect enum SingleOrMany<T: Equatable>: Equatable {
-  typealias Mapper<E> = (JSONValue) throws(E) -> T
+  typealias Mapper<E: Error> = (JSONValue) throws(E) -> T
 
   case single(T)
   case many([T])
