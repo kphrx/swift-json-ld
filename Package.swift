@@ -52,7 +52,9 @@ var package = Package(
   ]
 )
 
-if ProcessInfo.processInfo.environment["ENABLE_SWIFT_PLUGIN"] != nil {
+if ProcessInfo.processInfo.environment["ENABLE_SWIFT_PLUGIN"] != nil
+  || ProcessInfo.processInfo.environment["ADDITIONAL_DOCC_ARGUMENTS"] != nil
+{
   package.dependencies += [
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6")
   ]
