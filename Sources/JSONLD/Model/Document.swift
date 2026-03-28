@@ -53,7 +53,7 @@ extension JSONLDDocument: Decodable where P == Unresolved {
   ///
   /// This initializer is only available for the `Unresolved` phase,
   /// as `Expanded` documents should only be created through the expansion algorithm.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let jsonValue = try JSONValue(from: decoder)
     try self.init(validating: jsonValue)
   }

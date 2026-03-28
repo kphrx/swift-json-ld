@@ -54,7 +54,7 @@ public enum JSONValue: Sendable, Equatable {
 
 extension JSONValue: Codable {
   /// Creates a JSON value by decoding from the given decoder.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let container = try decoder.singleValueContainer()
 
     self =
@@ -76,7 +76,7 @@ extension JSONValue: Codable {
   }
 
   /// Encodes this JSON value as JSON data.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
 
     switch self {
