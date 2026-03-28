@@ -188,6 +188,8 @@ jobs:
           echo "source_base_url=$SOURCE_BASE_URL" >> "$GITHUB_OUTPUT"
 
       - name: Generate documentation
+        env:
+          ENABLE_SWIFT_PLUGIN: "1"
         run: |
           swiftly run -- swift package plugin --allow-writing-to-package-directory generate-documentation --output-path _site/ \
             --disable-indexing ${{ steps.docs-args.outputs.combined }} --symbol-graph-minimum-access-level public \

@@ -3,7 +3,9 @@
 
 import PackageDescription
 
-let package = Package(
+import class Foundation.ProcessInfo
+
+var package = Package(
   name: "swift-json-codable",
   platforms: [
     .macOS(.v10_15),
@@ -21,9 +23,6 @@ let package = Package(
       name: "JSONLD",
       targets: ["JSONLD"]
     ),
-  ],
-  dependencies: [
-    .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6")
   ],
   targets: [
     // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -52,3 +51,9 @@ let package = Package(
     ),
   ]
 )
+
+if ProcessInfo.processInfo.environment["ENABLE_SWIFT_PLUGIN"] != nil {
+  package.dependencies += [
+    .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6")
+  ]
+}
