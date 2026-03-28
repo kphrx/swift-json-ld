@@ -189,7 +189,7 @@ jobs:
 
       - name: Generate documentation
         run: |
-          swiftly run -- swift package --allow-writing-to-package-directory generate-documentation --output-path _site/ \
+          swiftly run -- swift package plugin --allow-writing-to-package-directory generate-documentation --output-path _site/ \
             --disable-indexing ${{ steps.docs-args.outputs.combined }} --symbol-graph-minimum-access-level public \
             --checkout-path "$PWD" --source-service github --source-service-base-url ${{ steps.docs-args.outputs.source_base_url }} \
             --transform-for-static-hosting ${{ steps.docs-args.outputs.base_path }}
