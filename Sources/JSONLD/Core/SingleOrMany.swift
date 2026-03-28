@@ -3,7 +3,7 @@
 
 /// A JSON-LD value that can be either a single item or an array of items.
 public indirect enum SingleOrMany<T: Equatable>: Equatable {
-  typealias Mapper = (JSONValue) throws(JSONLDError) -> T
+  typealias Mapper<E> = (JSONValue) throws(E) -> T
 
   case single(T)
   case many([T])
@@ -21,11 +21,11 @@ public indirect enum SingleOrMany<T: Equatable>: Equatable {
     self = .many(values)
   }
 
-  init(from jsonArray: JSONArray, mapper: Mapper) throws(JSONLDError) {
+  init<E>(from jsonArray: JSONArray, mapper: Mapper<E>) throws(E) {
     self.init(try jsonArray.map(mapper))
   }
 
-  init(from jsonValue: JSONValue, mapper: Mapper) throws(JSONLDError) {
+  init<E>(from jsonValue: JSONValue, mapper: Mapper<E>) throws(E) {
     if case .array(let array) = jsonValue {
       try self.init(from: array, mapper: mapper)
     } else {
