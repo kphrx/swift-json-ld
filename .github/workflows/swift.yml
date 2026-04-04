@@ -13,12 +13,13 @@ env:
   SWIFTLY: "1.1.1"
 
 jobs:
-  cache-swiftly:
+  install-swiftly:
 
     runs-on: ubuntu-latest
     outputs:
-      swiftly_home_dir: ${{ steps.configure-swiftly.outputs.home_dir }}
-      swiftly_toolchain_dir: ${{ steps.configure-swiftly.outputs.toolchain_dir }}
+      swiftly_dir: ${{ steps.configure-swiftly.outputs.home_dir }}
+      cache_versions: ${{ steps.configure-swiftly.outputs.ci_versions }}
+      versions: ${{ steps.setup-swiftly.outputs.ci_versions }}
 
     steps:
       - name: Cache Swift.org GPG keys
@@ -44,11 +45,16 @@ jobs:
           RUNNER_ARCH="${{ runner.arch }}"
           RUNNER_ARCH="${RUNNER_ARCH,,}"
           SWIFTLY_VERSION="${{ env.SWIFTLY }}/${RUNNER_ARCH}"
+          SWIFTLY_HOME_DIR="${{ runner.tool_cache }}/swiftly/${SWIFTLY_VERSION}"
+          SWIFTLY_BIN_DIR="${SWIFTLY_HOME_DIR}/bin"
+          echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
           {
             echo "runner_machine=$(uname -m)"
             echo "version=${SWIFTLY_VERSION}"
-            echo "home_dir=${{ runner.tool_cache }}/swiftly/${SWIFTLY_VERSION}"
-            echo "toolchain_dir=${{ runner.tool_cache }}/swift/${SWIFTLY_VERSION}"
+            echo "home_dir=${SWIFTLY_HOME_DIR}"
+            echo "bin_dir=${SWIFTLY_BIN_DIR}"
+            echo "toolchains_dir=${SWIFTLY_HOME_DIR}/toolchains"
+            echo "ci_versions=6.0-6.1-6.2"
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v6
@@ -56,10 +62,8 @@ jobs:
       - name: Cache swiftly
         uses: actions/cache@v5
         with:
-          path: |
-            ${{ steps.configure-swiftly.outputs.home_dir }}
-            ${{ steps.configure-swiftly.outputs.toolchain_dir }}
-          key: swift-${{ runner.os }}-${{ runner.arch }}-swiftly-${{ env.SWIFTLY }}-${{ hashFiles('.swift-version') }}
+          path: ${{ steps.configure-swiftly.outputs.home_dir }}
+          key: swift-${{ runner.os }}-${{ runner.arch }}-swiftly-${{ env.SWIFTLY }}-${{ steps.configure-swiftly.outputs.ci_versions }}-${{ hashFiles('.swift-version') }}
           restore-keys: |
             swift-${{ runner.os }}-${{ runner.arch }}-swiftly-${{ env.SWIFTLY }}-
       - name: Setup swiftly
@@ -68,8 +72,9 @@ jobs:
           DIST_NAME: swiftly-${{ env.SWIFTLY }}-${{ steps.configure-swiftly.outputs.runner_machine }}
           SWIFT_GPG_KEY: ${{ runner.temp }}/swift-gpg-key/all-keys.asc
           SWIFTLY_HOME_DIR: ${{ steps.configure-swiftly.outputs.home_dir }}
-          SWIFTLY_BIN_DIR: ${{ steps.configure-swiftly.outputs.home_dir }}/bin
-          SWIFTLY_TOOLCHAINS_DIR: ${{ steps.configure-swiftly.outputs.toolchain_dir }}
+          SWIFTLY_BIN_DIR: ${{ steps.configure-swiftly.outputs.bin_dir }}
+          SWIFTLY_TOOLCHAINS_DIR: ${{ steps.configure-swiftly.outputs.toolchains_dir }}
+          TOOLCHAIN_VERSIONS: ${{ steps.configure-swiftly.outputs.ci_versions }}
         run: |
           if ! [ -d "$SWIFTLY_HOME_DIR" ] || ! [ -f "${SWIFTLY_HOME_DIR}/.complete" ]; then
             mkdir -p "$SWIFTLY_HOME_DIR" && cd "$SWIFTLY_HOME_DIR"
@@ -88,9 +93,24 @@ jobs:
             cd ${{ github.workspace }}
           fi
 
-          . "${SWIFTLY_HOME_DIR}/env.sh"
           sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
-          swiftly install --verify --format json --assume-yes
+          {
+            echo -n 'ci_versions='
+            {
+              echo "["
+              for version in $(echo "$TOOLCHAIN_VERSIONS" | tr '-' ' '); do
+                swiftly install "$version" --verify --format json --assume-yes | jq -c 'del(.alreadyInstalled) | .current = false'
+                echo ","
+              done
+              swiftly install --verify --format json --assume-yes | jq -c 'del(.alreadyInstalled) | .current = true'
+              echo "]"
+            } | jq -cr .
+          } >> "$GITHUB_OUTPUT"
+      - name: Cache swiftly
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.configure-swiftly.outputs.home_dir }}
+          key: swift-${{ runner.os }}-${{ runner.arch }}-swiftly-${{ env.SWIFTLY }}-${{ steps.configure-swiftly.outputs.ci_versions }}-${{ hashFiles('.swift-version') }}
 
   soundness:
 
@@ -103,7 +123,10 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    needs: [cache-swiftly, soundness]
+    needs: [install-swiftly, soundness]
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.install-swiftly.outputs.versions) }}
 
     steps:
       - uses: actions/checkout@v6
@@ -111,14 +134,13 @@ jobs:
       - name: Restore swiftly
         uses: actions/cache/restore@v5
         with:
-          path: |
-            ${{ needs.cache-swiftly.outputs.swiftly_home_dir }}
-            ${{ needs.cache-swiftly.outputs.swiftly_toolchain_dir }}
-          key: swift-${{ runner.os }}-${{ runner.arch }}-swiftly-${{ env.SWIFTLY }}-${{ hashFiles('.swift-version') }}
+          fail-on-cache-miss: true
+          path: ${{ needs.install-swiftly.outputs.swiftly_dir }}
+          key: swift-${{ runner.os }}-${{ runner.arch }}-swiftly-${{ env.SWIFTLY }}-${{ needs.install-swiftly.outputs.cache_versions }}-${{ hashFiles('.swift-version') }}
       - name: Setup swiftly
         run: |
           sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
-          . ${{ needs.cache-swiftly.outputs.swiftly_home_dir }}/env.sh
+          . ${{ needs.install-swiftly.outputs.swiftly_dir }}/env.sh
           {
             echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR"
             echo "SWIFTLY_BIN_DIR=$SWIFTLY_BIN_DIR"
@@ -127,9 +149,10 @@ jobs:
           echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
 
       - name: Build
-        run: swiftly run -- swift build ${{ runner.debug == '1' && '--verbose' || '' }}
+        run: swiftly run -- swift build ${{ runner.debug == '1' && '--very-verbose' || '--verbose' }} +${{ matrix.version }}
 
       - name: Checkout w3c/json-ld-api
+        if: ${{ matrix.current }}
         uses: actions/checkout@v6
         with:
           repository: w3c/json-ld-api
@@ -137,18 +160,26 @@ jobs:
       - name: Run tests
         env:
           JSONLD_TEST_FIXTURES: ${{ github.workspace }}/vender/json-ld-api/tests/
-        run: swiftly run -- swift test --disable-xctest --enable-code-coverage ${{ runner.debug == '1' && '--verbose' || '' }}
+        run: swiftly run -- swift test --disable-xctest --enable-code-coverage ${{ runner.debug == '1' && '--very-verbose' || '--verbose' }}
       - name: Generate lcov report
+        if: ${{ matrix.current }}
         run: |
           BINARY_PATH="$(swiftly run -- swift build --show-bin-path)"
           CODECOV_PATH="$(swiftly run -- swift test --show-codecov-path | xargs dirname)"
           swiftly run -- llvm-cov report -ignore-filename-regex="/.build/|/Tests/" -instr-profile "${CODECOV_PATH}/default.profdata" "${BINARY_PATH}/swift-json-codablePackageTests.xctest" \
             | sed 's/  \+/|/g;s/--\+/||||||||||||/;2s/|/-|/g;s/-|$/-|-/' >> "$GITHUB_STEP_SUMMARY"
 
+  build-conclusion:
+
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - run: exit 0
+
   docs:
 
     runs-on: ubuntu-latest
-    needs: [cache-swiftly, soundness]
+    needs: [install-swiftly, soundness]
 
     steps:
       - uses: actions/checkout@v6
@@ -156,14 +187,13 @@ jobs:
       - name: Restore swiftly
         uses: actions/cache/restore@v5
         with:
-          path: |
-            ${{ needs.cache-swiftly.outputs.swiftly_home_dir }}
-            ${{ needs.cache-swiftly.outputs.swiftly_toolchain_dir }}
-          key: swift-${{ runner.os }}-${{ runner.arch }}-swiftly-${{ env.SWIFTLY }}-${{ hashFiles('.swift-version') }}
+          fail-on-cache-miss: true
+          path: ${{ needs.install-swiftly.outputs.swiftly_dir }}
+          key: swift-${{ runner.os }}-${{ runner.arch }}-swiftly-${{ env.SWIFTLY }}-${{ needs.install-swiftly.outputs.cache_versions }}-${{ hashFiles('.swift-version') }}
       - name: Setup swiftly
         run: |
           sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
-          . ${{ needs.cache-swiftly.outputs.swiftly_home_dir }}/env.sh
+          . ${{ needs.install-swiftly.outputs.swiftly_dir }}/env.sh
           {
             echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR"
             echo "SWIFTLY_BIN_DIR=$SWIFTLY_BIN_DIR"
@@ -188,8 +218,11 @@ jobs:
           echo "source_base_url=$SOURCE_BASE_URL" >> "$GITHUB_OUTPUT"
 
       - name: Generate documentation
+        env:
+          ENABLE_SWIFT_PLUGIN: "1"
         run: |
-          swiftly run -- swift package --allow-writing-to-package-directory generate-documentation --output-path _site/ \
+          swiftly run -- swift package ${{ runner.debug == '1' && '--very-verbose' || '--verbose' }} plugin --allow-writing-to-package-directory \
+            generate-documentation --output-path _site/ \
             --disable-indexing ${{ steps.docs-args.outputs.combined }} --symbol-graph-minimum-access-level public \
             --checkout-path "$PWD" --source-service github --source-service-base-url ${{ steps.docs-args.outputs.source_base_url }} \
             --transform-for-static-hosting ${{ steps.docs-args.outputs.base_path }}

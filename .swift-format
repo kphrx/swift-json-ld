@@ -5,6 +5,7 @@
   "indentation": {
     "spaces": 2
   },
+  "indentBlankLines": false,
   "indentConditionalCompilationBlocks": false,
   "indentSwitchCaseLabels": false,
   "lineBreakAroundMultilineExpressionChainComponents": false,
@@ -19,6 +20,9 @@
     "allowedFunctions": [
       "XCTAssertNoThrow"
     ]
+  },
+  "orderedImports": {
+    "includeConditionalImports": false
   },
   "prioritizeKeepingFunctionOutputTogether": true,
   "reflowMultilineStringLiterals": "never",

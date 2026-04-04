@@ -37,7 +37,7 @@ extension Contexts {
 
 extension Contexts: Decodable {
   /// Creates a context from a decoder.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let jsonValue = try JSONValue(from: decoder)
     try self.init(from: jsonValue)
   }

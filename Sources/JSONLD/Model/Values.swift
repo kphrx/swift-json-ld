@@ -27,7 +27,7 @@ extension JSONLDValues: Decodable where P == Unresolved {
   /// Initializes values from a decoder.
   ///
   /// This initializer is only available for the `Unresolved` phase.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let jsonValue = try JSONValue(from: decoder)
     try self.init(validating: jsonValue)
   }
