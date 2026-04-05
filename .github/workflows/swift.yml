@@ -114,7 +114,7 @@ jobs:
 
   soundness:
 
-    uses: swiftlang/github-workflows/.github/workflows/soundness.yml@0.0.8
+    uses: swiftlang/github-workflows/.github/workflows/soundness.yml@0.0.9
     with:
       unacceptable_language_check_enabled: false
       shell_check_enabled: false
