@@ -19,6 +19,7 @@ jobs:
     outputs:
       swiftly_dir: ${{ steps.configure-swiftly.outputs.home_dir }}
       cache_versions: ${{ steps.configure-swiftly.outputs.ci_versions }}
+      current_version: ${{ steps.setup-swiftly.outputs.current_swift_version }}
       versions: ${{ steps.setup-swiftly.outputs.ci_versions }}
 
     steps:
@@ -94,15 +95,17 @@ jobs:
           fi
 
           sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+          CURRENT_SWIFT="$(swiftly install --verify --format json --assume-yes | jq -cr 'del(.alreadyInstalled)')"
           {
+            echo "current_swift_version=$(echo "$CURRENT_SWIFT" | jq -cr '.version')"
             echo -n 'ci_versions='
             {
               echo "["
               for version in $(echo "$TOOLCHAIN_VERSIONS" | tr '-' ' '); do
-                swiftly install "$version" --verify --format json --assume-yes | jq -c 'del(.alreadyInstalled) | .current = false'
+                swiftly install "$version" --verify --format json --assume-yes | jq -cr 'del(.alreadyInstalled)'
                 echo ","
               done
-              swiftly install --verify --format json --assume-yes | jq -c 'del(.alreadyInstalled) | .current = true'
+              echo "$CURRENT_SWIFT"
               echo "]"
             } | jq -cr .
           } >> "$GITHUB_OUTPUT"
@@ -115,7 +118,11 @@ jobs:
   soundness:
 
     uses: swiftlang/github-workflows/.github/workflows/soundness.yml@0.0.9
+    needs: install-swiftly
     with:
+      api_breakage_check_container_image: "swift:${{ needs.install-swiftly.outputs.current_version }}-noble"
+      docs_check_enabled: false
+      format_check_container_image: "swift:${{ needs.install-swiftly.outputs.current_version }}-noble"
       unacceptable_language_check_enabled: false
       shell_check_enabled: false
       python_lint_check_enabled: false
@@ -123,7 +130,7 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    needs: [install-swiftly, soundness]
+    needs: install-swiftly
     strategy:
       matrix:
         include: ${{ fromJson(needs.install-swiftly.outputs.versions) }}
@@ -152,7 +159,7 @@ jobs:
         run: swiftly run -- swift build ${{ runner.debug == '1' && '--very-verbose' || '--verbose' }} +${{ matrix.version }}
 
       - name: Checkout w3c/json-ld-api
-        if: ${{ matrix.current }}
+        if: ${{ matrix.version == needs.install-swiftly.outputs.current_version }}
         uses: actions/checkout@v6
         with:
           repository: w3c/json-ld-api
@@ -162,7 +169,7 @@ jobs:
           JSONLD_TEST_FIXTURES: ${{ github.workspace }}/vender/json-ld-api/tests/
         run: swiftly run -- swift test --disable-xctest --enable-code-coverage ${{ runner.debug == '1' && '--very-verbose' || '--verbose' }}
       - name: Generate lcov report
-        if: ${{ matrix.current }}
+        if: ${{ matrix.version == needs.install-swiftly.outputs.current_version }}
         run: |
           BINARY_PATH="$(swiftly run -- swift build --show-bin-path)"
           CODECOV_PATH="$(swiftly run -- swift test --show-codecov-path | xargs dirname)"
@@ -179,7 +186,7 @@ jobs:
   docs:
 
     runs-on: ubuntu-latest
-    needs: [install-swiftly, soundness]
+    needs: install-swiftly
 
     steps:
       - uses: actions/checkout@v6
