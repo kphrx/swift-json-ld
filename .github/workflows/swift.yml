@@ -95,19 +95,17 @@ jobs:
           fi
 
           sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
-          CURRENT_SWIFT="$(swiftly install --verify --format json --assume-yes | jq -cr '.version')"
+          CURRENT_SWIFT="$(swiftly install --verify --format json --assume-yes | jq -cr 'del(.alreadyInstalled)')"
           {
-            echo "current_swift_version=$CURRENT_SWIFT"
+            echo "current_swift_version=$(echo "$CURRENT_SWIFT" | jq -cr '.version')"
             echo -n 'ci_versions='
             {
               echo "["
               for version in $(echo "$TOOLCHAIN_VERSIONS" | tr '-' ' '); do
-                swiftly install "$version" --verify --format json --assume-yes | jq -c 'del(.alreadyInstalled) | .current = false'
+                swiftly install "$version" --verify --format json --assume-yes | jq -cr 'del(.alreadyInstalled)'
                 echo ","
               done
-              cat <<EOF
-              {"version": "$CURRENT_SWIFT", "current": false}
-              EOF
+              echo "$CURRENT_SWIFT"
               echo "]"
             } | jq -cr .
           } >> "$GITHUB_OUTPUT"
@@ -161,7 +159,7 @@ jobs:
         run: swiftly run -- swift build ${{ runner.debug == '1' && '--very-verbose' || '--verbose' }} +${{ matrix.version }}
 
       - name: Checkout w3c/json-ld-api
-        if: ${{ matrix.current }}
+        if: ${{ matrix.version == needs.install-swiftly.outputs.current_version }}
         uses: actions/checkout@v6
         with:
           repository: w3c/json-ld-api
@@ -171,7 +169,7 @@ jobs:
           JSONLD_TEST_FIXTURES: ${{ github.workspace }}/vender/json-ld-api/tests/
         run: swiftly run -- swift test --disable-xctest --enable-code-coverage ${{ runner.debug == '1' && '--very-verbose' || '--verbose' }}
       - name: Generate lcov report
-        if: ${{ matrix.current }}
+        if: ${{ matrix.version == needs.install-swiftly.outputs.current_version }}
         run: |
           BINARY_PATH="$(swiftly run -- swift build --show-bin-path)"
           CODECOV_PATH="$(swiftly run -- swift test --show-codecov-path | xargs dirname)"
