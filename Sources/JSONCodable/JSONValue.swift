@@ -163,9 +163,7 @@ extension JSONValue: CustomDebugStringConvertible {
   public var debugDescription: String {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    if #available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *) {
-      encoder.outputFormatting.insert(.withoutEscapingSlashes)
-    }
+    encoder.outputFormatting.insert(.withoutEscapingSlashes)
 
     do {
       guard let json = String(data: try encoder.encode(self), encoding: .utf8) else {

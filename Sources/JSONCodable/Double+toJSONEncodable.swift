@@ -16,8 +16,7 @@ extension Double {
   }
   #endif
 
-  // @available(SwiftStdlib 5.9, *)
-  @available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
+  @available(SwiftStdlib 5.9, *)
   func toJSONEncodable() -> Double {
     self
   }
