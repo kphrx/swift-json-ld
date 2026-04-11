@@ -223,6 +223,21 @@ public class JSONLDProcessor {
         )
       }
 
+    let contentType = Self.normalizedContentType(remoteDocument.contentType)
+    guard let contentType, Self.isJSONContentType(contentType) else {
+      throw .code(
+        .loadingDocumentFailed,
+        debugInfo: .init(
+          url: url,
+          message: "unsupported Content-Type: \(remoteDocument.contentType ?? "missing")"
+        )
+      )
+    }
+
+    if Self.shouldUseLinkHeaderContext(for: contentType) {
+      _ = try LinkHeaderContextParser.contextURL(from: remoteDocument.linkHeader)
+    }
+
     let document = try JSONLDDocument<Unresolved>(from: remoteDocument.document)
     return try await self.expand(
       document,
@@ -263,5 +278,22 @@ extension JSONLDProcessor {
       contexts: context,
       activeContext: activeContext
     )
+  }
+
+  private static func normalizedContentType(_ contentType: String?) -> String? {
+    guard let contentType else { return nil }
+    let base = contentType.split(separator: ";", maxSplits: 1).first
+    return base.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+  }
+
+  private static func isJSONContentType(_ contentType: String) -> Bool {
+    if contentType == "application/json" || contentType == "application/ld+json" {
+      return true
+    }
+    return contentType.hasSuffix("+json")
+  }
+
+  private static func shouldUseLinkHeaderContext(for contentType: String) -> Bool {
+    contentType != "application/ld+json"
   }
 }

@@ -22,23 +22,22 @@ public struct RemoteDocument: Sendable {
   /// This helps the processor determine how to handle the document (e.g., as `application/ld+json`).
   public let contentType: String?
 
-  /// The URL of an associated JSON-LD context.
+  /// The raw HTTP `Link` header, if provided by the loader.
   ///
-  /// This is typically retrieved from an HTTP `Link` header with the
-  /// `http://www.w3.org/ns/json-ld#context` relation.
-  public let contextURL: String?
+  /// This is used to resolve an associated JSON-LD context.
+  public let linkHeader: String?
 
   /// Creates a remote document with metadata.
   public init(
     documentURL: String,
     document: JSONValue,
     contentType: String? = nil,
-    contextURL: String? = nil
+    linkHeader: String? = nil
   ) {
     self.documentURL = documentURL
     self.document = document
     self.contentType = contentType
-    self.contextURL = contextURL
+    self.linkHeader = linkHeader
   }
 }
 
