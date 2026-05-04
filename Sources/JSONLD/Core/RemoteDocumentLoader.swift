@@ -3,31 +3,13 @@
 
 public import Foundation
 
-/// A structure representing a remote document and its associated metadata.
-///
-/// This structure encapsulates the result of a document loading operation,
-/// providing the JSON content along with metadata required by the JSON-LD Processing Algorithms.
 struct RemoteDocument: Sendable {
-  /// The final URL of the document after any redirects.
-  ///
-  /// This URL is used as the base IRI for the document if no `@base` is specified
-  /// within the document itself.
   let documentURL: String
 
-  /// The content of the document as a `JSONValue`.
-  ///
-  /// For JSON-LD documents, this should be the parsed JSON structure.
   let document: JSONValue
 
-  /// The content type of the document, if available.
-  ///
-  /// This helps the processor determine how to handle the document (e.g., as `application/ld+json`).
   let contentType: String?
 
-  /// The URL of an associated JSON-LD context.
-  ///
-  /// This is typically retrieved from an HTTP `Link` header with the
-  /// `http://www.w3.org/ns/json-ld#context` relation.
   let contextURL: String?
 
   private init(
@@ -149,6 +131,9 @@ extension CharacterSet {
 /// interpretation, such as content type checks and `Link` header processing, is performed by
 /// the JSON-LD processor.
 public struct RemoteDocumentResponse: Sendable {
+  /// A parsed HTTP `Link` header value from a remote document response.
+  ///
+  /// JSON-LD uses `Link` headers to discover alternate JSON-LD documents and external contexts.
   public struct LinkHeader: Sendable {
     let target: String
     let relations: [String]
