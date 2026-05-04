@@ -10,20 +10,30 @@ struct TestDocumentLoader: JSONLDDocumentLoader {
     case unknown(error: Swift.Error)
   }
 
+  var optionsByURL: [String: RemoteDocumentTest.Options] = [:]
+
   func load(url: String) async -> Result<RemoteDocumentResponse, any Swift.Error> {
     let base = "https://w3c.github.io/json-ld-api/tests/"
     guard url.hasPrefix(base) else {
       return .failure(Error.unknown(url: url))
     }
+
     let relativePath = String(url.dropFirst(base.count))
+    let options = self.optionsByURL[url]
+    let documentURL =
+      options?.redirectTo
+      .flatMap { URL(string: $0, relativeTo: URL(string: base))?.absoluteString }
+      ?? url
+    let documentPath = String(documentURL.dropFirst(base.count))
 
     do {
-      let body = try TestCaseLoader.loadData(String(url.dropFirst(base.count)))
+      let body = try TestCaseLoader.loadData(documentPath)
       return .success(
         RemoteDocumentResponse(
-          documentURL: url,
+          documentURL: documentURL,
           body: body,
-          contentType: Self.contentType(for: relativePath)
+          contentType: options?.contentType ?? Self.contentType(for: relativePath),
+          linkHeaders: options?.httpLink ?? []
         )
       )
     } catch let error {
