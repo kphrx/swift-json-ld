@@ -120,6 +120,7 @@ jobs:
     uses: swiftlang/github-workflows/.github/workflows/soundness.yml@0.0.9
     needs: install-swiftly
     with:
+      api_breakage_check_allowlist_path: "api-breakages.txt"
       api_breakage_check_container_image: "swift:${{ needs.install-swiftly.outputs.current_version }}-noble"
       docs_check_enabled: false
       format_check_container_image: "swift:${{ needs.install-swiftly.outputs.current_version }}-noble"
