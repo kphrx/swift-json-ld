@@ -72,6 +72,21 @@ extension Contexts: ExpressibleByDictionaryLiteral {
 }
 
 extension Contexts {
+  static func + (lhs: Self, rhs: Self) -> Self {
+    switch (lhs, rhs) {
+    case (.null, .null): .null
+    case (.null, let context), (let context, .null): context
+
+    case (.single(let lhsElement), .single(let rhsElement)): .array([lhsElement, rhsElement])
+
+    case (.array(let lhsElements), .single(let rhsElement)): .array(lhsElements + [rhsElement])
+    case (.single(let lhsElement), .array(let rhsElements)): .array([lhsElement] + rhsElements)
+    case (.array(let lhsElements), .array(let rhsElements)): .array(lhsElements + rhsElements)
+    }
+  }
+}
+
+extension Contexts {
   /// A single `@context` element.
   public enum Element: CustomJSONValueConvertible, Equatable, Sendable {
     case absoluteIRI(String)

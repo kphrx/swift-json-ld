@@ -91,11 +91,15 @@ struct ContextResolver {
       var subContext = activeContext
       subContext.baseIRI = remoteDocument.documentURL
 
+      let previousBaseIRI = activeContext.baseIRI
+      let previousOriginalBaseIRI = activeContext.originalBaseIRI
       activeContext = try await self.process(
         contexts: remoteContext,
         activeContext: subContext,
         remoteContexts: updatedRemoteContexts
       )
+      activeContext.baseIRI = previousBaseIRI
+      activeContext.originalBaseIRI = previousOriginalBaseIRI
 
     case .contextDefinition(let definition):
       try self.apply(contextDefinition: definition, to: &activeContext)

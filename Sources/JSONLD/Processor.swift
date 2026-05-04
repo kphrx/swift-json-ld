@@ -218,9 +218,19 @@ public class JSONLDProcessor {
     )
 
     let document = try JSONLDDocument<Unresolved>(from: remoteDocument.document)
+    let remoteContext: Contexts? =
+      if let contextURL = remoteDocument.contextURL {
+        if let expandContext {
+          .single(.init(iri: contextURL)) + expandContext
+        } else {
+          .single(.init(iri: contextURL))
+        }
+      } else {
+        expandContext
+      }
     return try await self.expand(
       document,
-      expandContext: expandContext,
+      expandContext: remoteContext,
       baseIRI: remoteDocument.documentURL,
       normative: normative
     )
