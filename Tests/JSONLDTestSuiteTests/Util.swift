@@ -8,15 +8,16 @@ enum Util {
     case missingFixture(String)
   }
 
+  static func loadFixtureData(_ name: String, from url: URL? = nil) throws -> Data {
+    try Data(contentsOf: self.findResourceURL(for: name, from: url))
+  }
+
   static func loadFixture<T: Decodable>(
     _ name: String,
     from url: URL? = nil,
     type: T.Type = T.self
   ) throws -> T {
-    try JSONDecoder().decode(
-      type,
-      from: Data(contentsOf: self.findResourceURL(for: name, from: url))
-    )
+    try JSONDecoder().decode(type, from: Self.loadFixtureData(name, from: url))
   }
 
   private static func findResourceURL(for name: String, from url: URL?) throws(Error) -> URL {

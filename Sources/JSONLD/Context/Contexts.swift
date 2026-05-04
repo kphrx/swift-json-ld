@@ -53,11 +53,7 @@ extension Contexts: ExpressibleByNilLiteral {
 extension Contexts: ExpressibleByStringLiteral {
   /// Creates a context literal from an IRI string.
   public init(stringLiteral value: String) {
-    do {
-      self = .single(try .init(iri: value))
-    } catch {
-      preconditionFailure("Invalid @context literal: \(error)")
-    }
+    self = .single(.init(iri: value))
   }
 }
 
@@ -87,11 +83,7 @@ extension Contexts {
 extension Contexts.Element: ExpressibleByStringLiteral {
   /// Creates a context element literal from an IRI string.
   public init(stringLiteral value: String) {
-    do {
-      try self.init(iri: value)
-    } catch {
-      preconditionFailure("Invalid @context literal: \(error)")
-    }
+    self.init(iri: value)
   }
 }
 
@@ -111,7 +103,7 @@ extension Contexts.Element {
     }
   }
 
-  init(iri value: String) throws(JSONLDError) {
+  init(iri value: String) {
     self =
       if value.contains(":") {
         .absoluteIRI(value)
@@ -130,7 +122,7 @@ extension Contexts.Element {
     self =
       switch jsonValue {
       case .object(let jsonObject): try .init(from: jsonObject)
-      case .string(let value): try .init(iri: value)
+      case .string(let value): .init(iri: value)
       default: throw .code(.invalidLocalContext)
       }
   }

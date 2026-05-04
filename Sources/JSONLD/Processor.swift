@@ -211,17 +211,11 @@ public class JSONLDProcessor {
     expandContext: Contexts? = nil,
     normative: Bool = true
   ) async throws(JSONLDError) -> JSONLDDocument<Expanded> {
-    let result = await self.loader.load(url: url)
-    let remoteDocument: RemoteDocument =
-      switch result {
-      case .success(let doc):
-        doc
-      case .failure(let error):
-        throw .code(
-          .loadingRemoteContextFailed,
-          debugInfo: .init(url: url, message: String(describing: error))
-        )
-      }
+    let remoteDocument = try await RemoteDocument.load(
+      url: url,
+      using: self.loader,
+      failureCode: .loadingDocumentFailed
+    )
 
     let document = try JSONLDDocument<Unresolved>(from: remoteDocument.document)
     return try await self.expand(
@@ -234,7 +228,7 @@ public class JSONLDProcessor {
 }
 
 private struct DefaultLoader: JSONLDDocumentLoader {
-  func load(url: String) async -> Result<RemoteDocument, any Error> {
+  func load(url: String) async -> Result<RemoteDocumentResponse, any Error> {
     // TODO: Implementation of a default loader using URLSession or AsyncHTTPClient.
     .failure(
       JSONLDError.code(

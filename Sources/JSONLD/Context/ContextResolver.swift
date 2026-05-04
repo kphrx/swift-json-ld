@@ -78,17 +78,7 @@ struct ContextResolver {
         )
       }
 
-      let result = await loader.load(url: resolvedIRI)
-      let remoteDocument: RemoteDocument =
-        switch result {
-        case .success(let doc):
-          doc
-        case .failure(let error):
-          throw .code(
-            .loadingRemoteContextFailed,
-            debugInfo: .init(url: resolvedIRI, message: String(describing: error))
-          )
-        }
+      let remoteDocument = try await RemoteDocument.load(url: resolvedIRI, using: loader)
 
       guard case .object(let object) = remoteDocument.document,
         let innerContext = object[.context]

@@ -85,6 +85,10 @@ enum TestCaseLoader {
     try Util.loadFixture(name, from: self.testCasePath, type: type)
   }
 
+  static func loadData(_ name: String) throws -> Data {
+    try Util.loadFixtureData(name, from: self.testCasePath)
+  }
+
   static func loadContexts(_ name: String?) throws -> Contexts? {
     guard let name else { return nil }
     let jsonValue: JSONValue = try self.load(name, type: JSONValue.self)
