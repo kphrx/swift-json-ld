@@ -78,7 +78,11 @@ struct ContextResolver {
         )
       }
 
-      let remoteDocument = try await RemoteDocument.load(url: resolvedIRI, using: loader)
+      let remoteDocument = try await RemoteDocument.load(
+        url: resolvedIRI,
+        using: loader,
+        requestProfile: RemoteDocument.contextProfile
+      )
 
       guard case .object(let object) = remoteDocument.document,
         let innerContext = object[.context]

@@ -238,7 +238,10 @@ public class JSONLDProcessor {
 }
 
 private struct DefaultLoader: JSONLDDocumentLoader {
-  func load(url: String) async -> Result<RemoteDocumentResponse, any Error> {
+  func load(
+    url: String,
+    requestProfile: String?
+  ) async -> Result<RemoteDocumentResponse, any Error> {
     // TODO: Implementation of a default loader using URLSession or AsyncHTTPClient.
     .failure(
       JSONLDError.code(

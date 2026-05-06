@@ -24,14 +24,15 @@ struct RemoteDocument: Sendable {
     self.contextURL = contextURL
   }
 
-  private static let contextRelation = "http://www.w3.org/ns/json-ld#context"
+  static let contextProfile = "http://www.w3.org/ns/json-ld#context"
 
   static func load(
     url: String,
     using loader: any JSONLDDocumentLoader,
+    requestProfile: String? = nil,
     failureCode: JSONLDError.Code = .loadingRemoteContextFailed
   ) async throws(JSONLDError) -> Self {
-    let result = await loader.load(url: url)
+    let result = await loader.load(url: url, requestProfile: requestProfile)
     let response: RemoteDocumentResponse =
       switch result {
       case .success(let response):
@@ -49,25 +50,29 @@ struct RemoteDocument: Sendable {
         return try await Self.load(
           url: Self.resolveIRI(alternate.target, against: response.documentURL),
           using: loader,
+          requestProfile: requestProfile,
           failureCode: failureCode
         )
       }
     }
 
-    return try Self.fromResponse(response)
+    return try Self.fromResponse(response, failureCode: failureCode)
   }
 
-  static func fromResponse(_ response: RemoteDocumentResponse) throws(JSONLDError) -> Self {
+  static func fromResponse(
+    _ response: RemoteDocumentResponse,
+    failureCode: JSONLDError.Code = .loadingDocumentFailed
+  ) throws(JSONLDError) -> Self {
     let mediaType = Self.mediaType(from: response.contentType)
     guard Self.isJSONMediaType(mediaType) else {
-      throw .code(.loadingDocumentFailed, debugInfo: .init(url: response.documentURL))
+      throw .code(failureCode, debugInfo: .init(url: response.documentURL))
     }
 
     let contextURL: String?
     if mediaType == "application/ld+json" {
       contextURL = nil
     } else {
-      let contextLinks = response.linkHeaders.filter({ $0.relations.contains(Self.contextRelation) }
+      let contextLinks = response.linkHeaders.filter({ $0.relations.contains(Self.contextProfile) }
       )
       guard contextLinks.count <= 1 else {
         throw .code(.multipleContextLinkHeaders, debugInfo: .init(url: response.documentURL))
@@ -82,7 +87,7 @@ struct RemoteDocument: Sendable {
       document = try JSONDecoder().decode(JSONValue.self, from: response.body)
     } catch {
       throw .code(
-        .loadingDocumentFailed,
+        failureCode,
         debugInfo: .init(url: response.documentURL, message: String(describing: error))
       )
     }
@@ -227,9 +232,14 @@ public struct RemoteDocumentResponse: Sendable {
 /// Implementations provide HTTP transport (e.g. `URLSession` or `AsyncHTTPClient`) while the
 /// JSON-LD module remains responsible for interpreting response headers and the response body.
 public protocol JSONLDDocumentLoader: Sendable {
-  /// Loads a document from the specified URL.
+  /// Loads a document from the specified URL with a requested profile.
   ///
-  /// - Parameter url: The URL of the document to load.
+  /// - Parameters:
+  ///   - url: The URL of the document to load.
+  ///   - requestProfile: The preferred media type profile, if any.
   /// - Returns: A `Result` containing either the raw HTTP response on success or an `Error` on failure.
-  func load(url: String) async -> Result<RemoteDocumentResponse, any Error>
+  func load(
+    url: String,
+    requestProfile: String?
+  ) async -> Result<RemoteDocumentResponse, any Error>
 }

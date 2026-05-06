@@ -12,7 +12,10 @@ struct TestDocumentLoader: JSONLDDocumentLoader {
 
   var optionsByURL: [String: RemoteDocumentTest.Options] = [:]
 
-  func load(url: String) async -> Result<RemoteDocumentResponse, any Swift.Error> {
+  func load(
+    url: String,
+    requestProfile: String?
+  ) async -> Result<RemoteDocumentResponse, any Swift.Error> {
     let base = "https://w3c.github.io/json-ld-api/tests/"
     guard url.hasPrefix(base) else {
       return .failure(Error.unknown(url: url))
