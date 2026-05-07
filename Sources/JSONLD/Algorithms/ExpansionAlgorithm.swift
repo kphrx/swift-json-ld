@@ -13,7 +13,7 @@ struct ExpansionAlgorithm {
 
   static func run(
     _ input: Input,
-    loader: any JSONLDDocumentLoader
+    loader: (any JSONLDDocumentLoader)?
   ) async throws(JSONLDError) -> JSONLDValues<Expanded> {
     _ = input.normative
 
