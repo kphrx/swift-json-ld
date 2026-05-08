@@ -5,22 +5,22 @@ public import Foundation
 
 struct RemoteDocument: Sendable {
   let documentURL: String
-
   let document: JSONValue
-
   let contentType: String?
-
+  let profile: String?
   let contextURL: String?
 
   private init(
     documentURL: String,
     document: JSONValue,
     contentType: String? = nil,
+    profile: String? = nil,
     contextURL: String? = nil
   ) {
     self.documentURL = documentURL
     self.document = document
     self.contentType = contentType
+    self.profile = contentType
     self.contextURL = contextURL
   }
 
@@ -44,7 +44,7 @@ struct RemoteDocument: Sendable {
         )
       }
 
-    if !Self.isJSONMediaType(response.contentType) {
+    if !response.isJSON {
       let alternateLinks = response.linkHeaders.filter({ $0.relations.contains("alternate") })
       if let alternate = alternateLinks.first, alternate.type == "application/ld+json" {
         return try await Self.load(
@@ -63,57 +63,37 @@ struct RemoteDocument: Sendable {
     _ response: RemoteDocumentResponse,
     failureCode: JSONLDError.Code = .loadingDocumentFailed
   ) throws(JSONLDError) -> Self {
-    let mediaType = Self.mediaType(from: response.contentType)
-    guard Self.isJSONMediaType(mediaType) else {
-      throw .code(failureCode, debugInfo: .init(url: response.documentURL))
+    let documentURL = response.documentURL
+    guard response.isJSON else {
+      throw .code(failureCode, debugInfo: .init(url: documentURL))
     }
 
-    let contextURL: String?
-    if mediaType == "application/ld+json" {
-      contextURL = nil
-    } else {
-      let contextLinks = response.linkHeaders.filter({ $0.relations.contains(Self.contextProfile) }
-      )
-      guard contextLinks.count <= 1 else {
-        throw .code(.multipleContextLinkHeaders, debugInfo: .init(url: response.documentURL))
+    let mediaType = response.mediaType
+    let contextLinks = response.linkHeaders.filter { $0.relations.contains(Self.contextProfile) }
+    let contextURL: String? =
+      if mediaType == "application/ld+json" {
+        nil
+      } else if contextLinks.count <= 1 {
+        contextLinks.first.flatMap { Self.resolveIRI($0.target, against: documentURL) }
+      } else {
+        throw .code(.multipleContextLinkHeaders, debugInfo: .init(url: documentURL))
       }
-      contextURL = contextLinks.first.flatMap {
-        Self.resolveIRI($0.target, against: response.documentURL)
-      }
-    }
 
-    let document: JSONValue
     do {
-      document = try JSONDecoder().decode(JSONValue.self, from: response.body)
+      let document = try JSONDecoder().decode(JSONValue.self, from: response.body)
+      return Self(
+        documentURL: documentURL,
+        document: document,
+        contentType: mediaType,
+        profile: response.profile,
+        contextURL: contextURL
+      )
     } catch {
       throw .code(
         failureCode,
-        debugInfo: .init(url: response.documentURL, message: String(describing: error))
+        debugInfo: .init(url: documentURL, message: String(describing: error))
       )
     }
-
-    return Self(
-      documentURL: response.documentURL,
-      document: document,
-      contentType: mediaType,
-      contextURL: contextURL
-    )
-  }
-
-  private static func mediaType(from contentType: String?) -> String? {
-    contentType?
-      .split(separator: ";", maxSplits: 1, omittingEmptySubsequences: true)
-      .first?
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-      .lowercased()
-  }
-
-  private static func isJSONMediaType(_ mediaType: String?) -> Bool {
-    guard let mediaType else { return true }
-    return mediaType == "application/json"
-      || mediaType == "application/ld+json"
-      || mediaType.hasPrefix("application/")
-        && mediaType.hasSuffix("+json")
   }
 
   private static func resolveIRI(_ iri: String, against baseIRI: String) -> String {
@@ -197,6 +177,40 @@ public struct RemoteDocumentResponse: Sendable {
 
   /// The HTTP `Link` header values, if available.
   public let linkHeaders: [LinkHeader]
+
+  var parsedContentType: (type: String, parameter: [String: String])? {
+    guard let contentType = self.contentType else { return nil }
+    let parts = contentType.split(separator: ";").map {
+      $0.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    guard let mediaType = parts.first?.lowercased() else { return nil }
+    return (
+      type: mediaType,
+      parameter: .init(
+        uniqueKeysWithValues: parts.dropFirst().compactMap {
+          let pair = $0.split(separator: "=", maxSplits: 1).map(String.init)
+          guard pair.count == 2 else { return nil }
+          return (pair[0].lowercased(), pair[1].trimmingCharacters(in: .doubleQuote))
+        }
+      )
+    )
+  }
+
+  var mediaType: String? {
+    self.parsedContentType?.type
+  }
+
+  var profile: String? {
+    self.parsedContentType?.parameter["profile"]
+  }
+
+  var isJSON: Bool {
+    guard let mediaType = self.mediaType else { return false }
+    return mediaType == "application/json"
+      || mediaType == "application/ld+json"
+      || mediaType.hasPrefix("application/")
+        && mediaType.hasSuffix("+json")
+  }
 
   /// Creates a raw remote document response.
   public init(
