@@ -74,3 +74,15 @@ struct FlattenTest {
   typealias PositiveCase = PositiveEvalutionTest<Options>
   typealias NegativeCase = NegativeEvalutionTest<Options>
 }
+
+enum RemoteDocumentTest {
+  struct Options {
+    private(set) var contentType: String? = nil
+    private(set) var httpLink: [String] = []
+    private(set) var redirectTo: String? = nil
+    private(set) var httpStatus: Int? = nil
+  }
+
+  typealias PositiveCase = PositiveEvalutionTest<Options>
+  typealias NegativeCase = NegativeEvalutionTest<Options>
+}

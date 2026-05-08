@@ -1,0 +1,9 @@
+API breakage: func JSONLDDocumentLoader.load(url:) has return type change from Swift.Result<JSONLD.RemoteDocument, any Swift.Error> to Swift.Result<JSONLD.RemoteDocumentResponse, any Swift.Error>
+API breakage: func JSONLDDocumentLoader.load(url:) has been renamed to func load(url:requestProfile:)
+API breakage: var JSONLDProcessor.loader has declared type change from any JSONLD.JSONLDDocumentLoader to (any JSONLD.JSONLDDocumentLoader)?
+API breakage: accessor JSONLDProcessor.loader.Get() has return type change from any JSONLD.JSONLDDocumentLoader to (any JSONLD.JSONLDDocumentLoader)?
+API breakage: accessor JSONLDProcessor.loader.Set() has parameter 0 type change from any JSONLD.JSONLDDocumentLoader to (any JSONLD.JSONLDDocumentLoader)?
+API breakage: var RemoteDocument.document has been removed
+API breakage: var RemoteDocument.contextURL has been removed
+API breakage: constructor RemoteDocument.init(documentURL:document:contentType:contextURL:) has been removed
+API breakage: struct RemoteDocument has been renamed to struct RemoteDocumentResponse
