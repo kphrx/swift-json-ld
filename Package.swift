@@ -7,6 +7,11 @@ import class Foundation.ProcessInfo
 
 var swiftSettings: [SwiftSetting] {
   [
+    .unsafeFlags([
+      "-Xfrontend", "-define-availability",
+      "-Xfrontend", "SwiftStdlib 5.9:macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0",
+    ]),
+
     .enableUpcomingFeature("ExistentialAny"),
     .enableUpcomingFeature("InternalImportsByDefault"),
     .enableUpcomingFeature("MemberImportVisibility"),
