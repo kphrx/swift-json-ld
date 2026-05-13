@@ -174,7 +174,7 @@ jobs:
         run: |
           BINARY_PATH="$(swiftly run -- swift build --show-bin-path)"
           CODECOV_PATH="$(swiftly run -- swift test --show-codecov-path | xargs dirname)"
-          swiftly run -- llvm-cov report -ignore-filename-regex="/.build/|/Tests/" -instr-profile "${CODECOV_PATH}/default.profdata" "${BINARY_PATH}/swift-json-codablePackageTests.xctest" \
+          swiftly run -- llvm-cov report -ignore-filename-regex="/.build/|/Tests/" -instr-profile "${CODECOV_PATH}/default.profdata" "${BINARY_PATH}/swift-json-ldPackageTests.xctest" \
             | sed 's/  \+/|/g;s/--\+/||||||||||||/;2s/|/-|/g;s/-|$/-|-/' >> "$GITHUB_STEP_SUMMARY"
 
   build-conclusion:

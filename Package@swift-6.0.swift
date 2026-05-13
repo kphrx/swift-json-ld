@@ -19,7 +19,7 @@ var swiftSettings: [SwiftSetting] {
 }
 
 var package = Package(
-  name: "swift-json-codable",
+  name: "swift-json-ld",
   platforms: [
     .macOS(.v10_15),
     .iOS(.v13),
