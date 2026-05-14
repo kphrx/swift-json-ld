@@ -1,10 +1,10 @@
-# swift-json-codable
+# swift-json-ld
 
 <!-- docc_landing_abstract_start -->
-swift-json-codable is a Swift 6 library for JSON value handling and JSON-LD 1.0 processing.
+swift-json-ld is a Swift 6 library for JSON value handling and JSON-LD 1.0 processing.
 <!-- docc_landing_abstract_end -->
 
-For usage examples and API references, see the [documentation](https://kpherox.dev/swift-json-codable/documentation/).
+For usage examples and API references, see the [documentation](https://kpherox.dev/swift-json-ld/documentation/).
 
 ## Requirements
 
@@ -12,18 +12,18 @@ For usage examples and API references, see the [documentation](https://kpherox.d
 
 ## Installation
 
-Add `swift-json-codable` to your `Package.swift`:
+Add `swift-json-ld` to your `Package.swift`:
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/kphrx/swift-json-codable.git", branch: "master")
+  .package(url: "https://github.com/kphrx/swift-json-ld.git", branch: "master")
 ],
 targets: [
   .target(
     name: "YourTarget",
     dependencies: [
       // JSONLD depends on JSONCodable and `@_exported` it, so you don't need to explicitly depend on JSONCodable.
-      .product(name: "JSONLD", package: "swift-json-codable")
+      .product(name: "JSONLD", package: "swift-json-ld")
     ]
   )
 ]
@@ -32,9 +32,9 @@ targets: [
 Alternatively, you can use SwiftPM commands:
 
 ```bash
-swift package add-dependency https://github.com/kphrx/swift-json-codable.git --branch master
-# swift package add-target-dependency JSONCodable YourTarget --package swift-json-codable
-swift package add-target-dependency JSONLD YourTarget --package swift-json-codable
+swift package add-dependency https://github.com/kphrx/swift-json-ld.git --branch master
+# swift package add-target-dependency JSONCodable YourTarget --package swift-json-ld
+swift package add-target-dependency JSONLD YourTarget --package swift-json-ld
 ```
 
 ## Modules
@@ -52,8 +52,8 @@ swift package add-target-dependency JSONLD YourTarget --package swift-json-codab
 ### Clone
 
 ```bash
-git clone https://github.com/kphrx/swift-json-codable.git
-cd swift-json-codable
+git clone https://github.com/kphrx/swift-json-ld.git
+cd swift-json-ld
 ```
 
 ### Build
@@ -94,7 +94,7 @@ rm -f Tests/JSONLDTestSuiteTests/Resources/Fixtures/json-ld-api-tests
 ln -s "$tmpdir/json-ld-api/tests" Tests/JSONLDTestSuiteTests/Resources/Fixtures/json-ld-api-tests
 ```
 
-Test fixtures are resolved from the built test bundle location (e.g., `.build/.../swift-json-codable_JSONLDTestSuiteTests.bundle/...`) rather than from the source tree path. Therefore, a relative symlink to `json-ld-api/tests` under `Tests/JSONLDTestSuiteTests/Resources/Fixtures/` fails to resolve.
+Test fixtures are resolved from the built test bundle location (e.g., `.build/.../swift-json-ld_JSONLDTestSuiteTests.bundle/...`) rather than from the source tree path. Therefore, a relative symlink to `json-ld-api/tests` under `Tests/JSONLDTestSuiteTests/Resources/Fixtures/` fails to resolve.
 
 ## License
 
