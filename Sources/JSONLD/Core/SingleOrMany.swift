@@ -84,10 +84,7 @@ extension SingleOrMany: Collection {
 
   /// Returns the position immediately after the given index.
   public func index(after i: Int) -> Int {
-    switch self {
-    case .single: 1
-    case .many(let values): values.index(after: i)
-    }
+    i + 1
   }
 }
 
