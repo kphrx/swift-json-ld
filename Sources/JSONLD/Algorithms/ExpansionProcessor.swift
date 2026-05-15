@@ -344,7 +344,7 @@ enum ExpansionProcessor {
     case .set(let values):
       let expanded = try await self.expand(
         activeContext,
-        value: values.preserveMap { .init($0) },
+        value: values.map { .init($0) },
         property: property,
         insideList: insideList,
         loader: loader
@@ -354,7 +354,7 @@ enum ExpansionProcessor {
       if insideList { throw .code(.listOfLists) }
       let expanded = try await self.expand(
         activeContext,
-        value: values.preserveMap { .init($0) },
+        value: values.map { .init($0) },
         property: property,
         insideList: true,
         loader: loader
@@ -405,7 +405,7 @@ enum ExpansionProcessor {
     for (_, values) in indexMap.map.sorted(by: { $0.key < $1.key }) {
       let expanded = try await self.expand(
         activeContext,
-        value: values.preserveMap { .init($0) },
+        value: values.map { .init($0) },
         property: property,
         insideList: insideList,
         loader: loader
