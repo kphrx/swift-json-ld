@@ -8,11 +8,41 @@ import Foundation
 /// This class handles operations like expansion, compaction, and flattening.
 /// It maintains configuration settings like the document loader.
 public class JSONLDProcessor {
+  /// A JSON-LD processing mode supported by ``JSONLDProcessor``.
+  ///
+  /// Processing mode selects the version-specific behavior used by JSON-LD algorithms.
+  /// The processor currently supports only JSON-LD 1.0, and callers must choose that
+  /// mode explicitly so future JSON-LD 1.1 support can be introduced without changing
+  /// the meaning of existing initializers.
+  public enum ProcessingMode: String {
+    /// JSON-LD 1.0 processing mode.
+    case v1p0 = "json-ld-1.0"
+
+    /// JSON-LD 1.1 processing mode.
+    ///
+    /// This case is reserved for the future and is unavailable until JSON-LD 1.1
+    /// algorithms are implemented.
+    @available(*, unavailable, message: "Unsupported JSON-LD 1.1 processing mode")
+    case v1p1 = "json-ld-1.1"
+  }
+
+  /// The processing mode changes the behavior of processing algorithms.
+  public let mode: ProcessingMode
+
   /// The loader used to resolve remote documents and contexts.
-  public var loader: (any JSONLDDocumentLoader)?
+  public let loader: (any JSONLDDocumentLoader)?
 
   /// Creates a JSON-LD processor.
-  public init() {}
+  ///
+  /// - Parameters:
+  ///   - mode: The JSON-LD processing mode to use. Pass ``ProcessingMode/v1p0`` to run the
+  ///     currently supported JSON-LD 1.0 algorithms.
+  ///   - loader: The document loader used to resolve remote documents and contexts. If no
+  ///     loader is provided, remote loading is disabled.
+  public init(mode: ProcessingMode, loader: (any JSONLDDocumentLoader)? = nil) {
+    self.mode = mode
+    self.loader = loader
+  }
 
   /// Expands the specified JSON-LD document.
   public func expand(

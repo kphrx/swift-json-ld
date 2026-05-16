@@ -19,8 +19,10 @@ struct RemoteDocumentTests {
   func positiveEvaluationTestOneZero(testCase: RemoteDocumentTest.PositiveCase) async throws {
     let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
     let documentIRI = manifestBase + testCase.input
-    let processor = JSONLDProcessor()
-    processor.loader = TestDocumentLoader(optionsByURL: [documentIRI: testCase.options])
+    let processor = JSONLDProcessor(
+      mode: .v1p0,
+      loader: TestDocumentLoader(optionsByURL: [documentIRI: testCase.options])
+    )
 
     let actual = try await processor.expand(url: documentIRI)
     let expect = try TestCaseLoader.load(
@@ -51,8 +53,10 @@ struct RemoteDocumentTests {
 
     let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
     let documentIRI = manifestBase + testCase.input
-    let processor = JSONLDProcessor()
-    processor.loader = TestDocumentLoader(optionsByURL: [documentIRI: testCase.options])
+    let processor = JSONLDProcessor(
+      mode: .v1p0,
+      loader: TestDocumentLoader(optionsByURL: [documentIRI: testCase.options])
+    )
 
     await #expect(throws: JSONLDError.code(expectError)) {
       _ = try await processor.expand(url: documentIRI)

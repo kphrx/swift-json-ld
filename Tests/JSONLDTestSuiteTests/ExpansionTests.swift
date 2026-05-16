@@ -14,8 +14,7 @@ struct ExpansionTests {
     arguments: TestCaseLoader.expansionTestsPositiveCases(version: .v1p0)
   )
   func positiveEvaluationTestOneZero(testCase: ExpandTest.PositiveCase) async throws {
-    let processor = JSONLDProcessor()
-    processor.loader = TestDocumentLoader()
+    let processor = JSONLDProcessor(mode: .v1p0, loader: TestDocumentLoader())
 
     let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
     let expandContext = try TestCaseLoader.loadContexts(testCase.options.expandContextFilename)
@@ -56,8 +55,7 @@ struct ExpansionTests {
       return
     }
 
-    let processor = JSONLDProcessor()
-    processor.loader = TestDocumentLoader()
+    let processor = JSONLDProcessor(mode: .v1p0, loader: TestDocumentLoader())
 
     // JSON-LD Test Suite base URL
     let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
