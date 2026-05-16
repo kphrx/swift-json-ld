@@ -3,7 +3,10 @@ API breakage: func JSONLDDocumentLoader.load(url:) has been renamed to func load
 API breakage: var JSONLDProcessor.loader has declared type change from any JSONLD.JSONLDDocumentLoader to (any JSONLD.JSONLDDocumentLoader)?
 API breakage: accessor JSONLDProcessor.loader.Get() has return type change from any JSONLD.JSONLDDocumentLoader to (any JSONLD.JSONLDDocumentLoader)?
 API breakage: accessor JSONLDProcessor.loader.Set() has parameter 0 type change from any JSONLD.JSONLDDocumentLoader to (any JSONLD.JSONLDDocumentLoader)?
+API breakage: accessor JSONLDProcessor.loader.Set() has been removed
 API breakage: var RemoteDocument.document has been removed
 API breakage: var RemoteDocument.contextURL has been removed
 API breakage: constructor RemoteDocument.init(documentURL:document:contentType:contextURL:) has been removed
 API breakage: struct RemoteDocument has been renamed to struct RemoteDocumentResponse
+API breakage: func SingleOrMany.preserveMap(_:) has been renamed to func map(_:)
+API breakage: constructor JSONLDProcessor.init() has been removed
