@@ -14,8 +14,7 @@ struct CompactionTests {
     arguments: TestCaseLoader.compactionTestsPositiveCases(version: .v1p0)
   )
   func positiveEvaluationTestOneZero(testCase: CompactTest.PositiveCase) async throws {
-    let processor = JSONLDProcessor()
-    processor.loader = TestDocumentLoader()
+    let processor = JSONLDProcessor(mode: .v1p0, loader: TestDocumentLoader())
     let input = try TestCaseLoader.load(testCase.input, type: JSONLDValues<Unresolved>.self)
     guard let context = try TestCaseLoader.loadContexts(testCase.options.contextFilename) else {
       Issue.record("Failed to load local context from \(testCase.options.contextFilename)")
@@ -57,8 +56,7 @@ struct CompactionTests {
       return
     }
 
-    let processor = JSONLDProcessor()
-    processor.loader = TestDocumentLoader()
+    let processor = JSONLDProcessor(mode: .v1p0, loader: TestDocumentLoader())
 
     let manifestBase = "https://w3c.github.io/json-ld-api/tests/"
     let documentIRI = manifestBase + testCase.input
